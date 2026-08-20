@@ -76,7 +76,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, Fragment } = React;
+    const { useState, useEffect, useRef, Fragment } = React;
 
     // --- Inline Icon Components ---
     const IconBase = ({ children, className = "w-5 h-5", style = {} }) => (
@@ -117,6 +117,78 @@
     const Flame = (props) => <IconBase {...props}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></IconBase>;
     const Crown = (props) => <IconBase {...props}><path d="m2 4 3 12h14l3-12-6 7-4-8-4 8-6-7z"/><path d="M5 20h14"/></IconBase>;
 
+    const SubtleConfetti = ({ active }) => {
+      const canvasRef = useRef(null);
+
+      useEffect(() => {
+        if (!active) return;
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const colors = ['#81c784', '#64b5f6', '#ffb74d', '#e1bee7', '#ff8a80', '#a1887f'];
+        const particles = Array.from({ length: 45 }).map(() => ({
+          x: canvas.width / 2 + (Math.random() * 100 - 50),
+          y: canvas.height * 0.2,
+          vx: (Math.random() - 0.5) * 8,
+          vy: Math.random() * -6 - 3,
+          size: Math.random() * 7 + 4,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rotation: Math.random() * 360,
+          rotationSpeed: (Math.random() - 0.5) * 8,
+          opacity: 1
+        }));
+
+        let animationFrameId;
+
+        const render = () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          let alive = false;
+
+          particles.forEach(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.25; // gentle gravity
+            p.opacity -= 0.015;
+            p.rotation += p.rotationSpeed;
+
+            if (p.opacity > 0) {
+              alive = true;
+              ctx.save();
+              ctx.globalAlpha = Math.max(0, p.opacity);
+              ctx.translate(p.x, p.y);
+              ctx.rotate((p.rotation * Math.PI) / 180);
+              ctx.fillStyle = p.color;
+              ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+              ctx.restore();
+            }
+          });
+
+          if (alive) {
+            animationFrameId = requestAnimationFrame(render);
+          }
+        };
+
+        render();
+
+        return () => {
+          if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        };
+      }, [active]);
+
+      if (!active) return null;
+
+      return (
+        <canvas 
+          ref={canvasRef} 
+          className="fixed inset-0 pointer-events-none z-[120] w-full h-full"
+        />
+      );
+    };
+
     const THEMES = {
       matcha: { 
         name: 'Sage & Linen', 
@@ -128,7 +200,9 @@
         primary: '#3d5a45', 
         primaryText: '#ffffff', 
         border: '#dad5c5', 
-        hover: '#dfdbcd' 
+        hover: '#dfdbcd',
+        headerBg: '#213326',
+        headerText: '#ffffff'
       },
       solarizedDark: { 
         name: 'Solarized Teal', 
@@ -140,7 +214,9 @@
         primary: '#2aa198', 
         primaryText: '#ffffff', 
         border: '#0d4a58', 
-        hover: '#0d4a58' 
+        hover: '#0d4a58',
+        headerBg: '#05232c',
+        headerText: '#2aa198'
       },
       espresso: { 
         name: 'Terracotta Oat', 
@@ -152,7 +228,9 @@
         primary: '#9e5239', 
         primaryText: '#ffffff', 
         border: '#e0ccbc', 
-        hover: '#e4d2c3' 
+        hover: '#e4d2c3',
+        headerBg: '#3b2a26',
+        headerText: '#faf6f0'
       },
       nordic: { 
         name: 'Nordic Slate', 
@@ -164,7 +242,9 @@
         primary: '#3b516b', 
         primaryText: '#ffffff', 
         border: '#cbd5e1', 
-        hover: '#d1dae6' 
+        hover: '#d1dae6',
+        headerBg: '#223042',
+        headerText: '#ffffff'
       },
       plum: { 
         name: 'Mauve Velvet', 
@@ -176,7 +256,9 @@
         primary: '#784b78', 
         primaryText: '#ffffff', 
         border: '#dbcbdb', 
-        hover: '#e0d1e0' 
+        hover: '#e0d1e0',
+        headerBg: '#362136',
+        headerText: '#ffffff'
       },
       monochrome: { 
         name: 'Chalk & Ink', 
@@ -188,7 +270,9 @@
         primary: '#121212', 
         primaryText: '#ffffff', 
         border: '#d1d1d1', 
-        hover: '#dadada' 
+        hover: '#dadada',
+        headerBg: '#121212',
+        headerText: '#ffffff'
       }
     };
 
@@ -239,7 +323,7 @@
     function App() {
       const [tasks, setTasks] = useState([]);
       const [stats, setStats] = useState({ completed: 0, created: 0, maxDoing: 0, maxTodo: 0 });
-      const [activeTab, setActiveTab] = useState('board'); // 'board', 'calendar', 'achievements'
+      const [activeTab, setActiveTab] = useState('board');
       const [isAdding, setIsAdding] = useState(false);
       
       const [newTaskText, setNewTaskText] = useState("");
@@ -250,6 +334,7 @@
       const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
 
       const [currentMonth, setCurrentMonth] = useState(new Date());
+      const [selectedCalDate, setSelectedCalDate] = useState(todayStr);
 
       useEffect(() => {
         const savedTasks = localStorage.getItem('tyquest_tasks');
@@ -386,14 +471,19 @@
           const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
           const tasksOnDay = tasks.filter(t => t.dueDate === dateStr && t.status !== 'done');
           const hasTasks = tasksOnDay.length > 0;
-          const isToday = dateStr === new Date().toISOString().split('T')[0];
+          const isToday = dateStr === todayStr;
+          const isSelected = dateStr === selectedCalDate;
 
           days.push(
-            <div key={d} className="h-10 w-10 flex flex-col items-center justify-center relative">
+            <div 
+              key={d} 
+              onClick={() => setSelectedCalDate(dateStr)}
+              className="h-10 w-10 flex flex-col items-center justify-center relative cursor-pointer"
+            >
               <div 
-                className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium transition-colors ${!hasTasks && isToday ? 'border border-current' : ''}`}
+                className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-medium transition-all ${isSelected ? 'ring-2 ring-white scale-110 shadow-md' : ''} ${!hasTasks && isToday ? 'border border-current' : ''}`}
                 style={{
-                  backgroundColor: hasTasks ? activeTheme.primary : 'transparent',
+                  backgroundColor: hasTasks ? activeTheme.primary : isSelected ? 'rgba(255,255,255,0.25)' : 'transparent',
                   color: hasTasks ? activeTheme.primaryText : activeTheme.text
                 }}
               >
@@ -413,6 +503,8 @@
         return days;
       };
 
+      const selectedDayTasks = tasks.filter(t => t.dueDate === selectedCalDate);
+
       return (
         <div 
           className="flex flex-col h-screen overflow-hidden relative transition-colors duration-300"
@@ -429,8 +521,11 @@
             '--app-hover': activeTheme.hover,
           }}
         >
+          {/* Subtle Confetti Canvas */}
+          <SubtleConfetti active={showCelebration} />
+
           {/* Header */}
-          <header className="pt-10 pb-4 px-5 border-b transition-colors duration-300 flex-shrink-0 z-10 flex justify-between items-center" style={{ borderColor: activeTheme.border, backgroundColor: activeTheme.bg }}>
+          <header className="pt-8 pb-4 px-5 sm:px-8 border-b transition-colors duration-300 flex-shrink-0 z-10 flex justify-between items-center" style={{ borderColor: activeTheme.border, backgroundColor: activeTheme.bg }}>
             <div className="flex-shrink-0 mr-2">
               <h1 className="text-xl sm:text-2xl font-arcade tracking-tight" style={{ color: activeTheme.primary }}>TyQuest</h1>
               <p className="text-[11px] sm:text-xs mt-0.5 transition-colors duration-300 font-medium uppercase tracking-wider" style={{ color: activeTheme.textMuted }}>
@@ -507,8 +602,8 @@
             
             {/* --- TAB 1: KANBAN BOARD --- */}
             {activeTab === 'board' && (
-              <div className="flex h-full overflow-x-auto snap-x snap-mandatory hide-scrollbar">
-                <div className="flex gap-4 px-6 py-6 h-full min-w-max">
+              <div className="flex h-full overflow-x-auto lg:overflow-x-visible snap-x snap-mandatory hide-scrollbar lg:justify-center">
+                <div className="flex lg:grid lg:grid-cols-3 gap-4 lg:gap-6 px-4 sm:px-8 py-6 h-full min-w-max lg:min-w-0 lg:w-full lg:max-w-6xl">
                   {columns.map((colId) => {
                     const colTasks = tasks.filter(t => t.status === colId);
                     const isDone = colId === 'done';
@@ -523,22 +618,39 @@
 
                     let lastCategory = null;
 
+                    // Custom header colors per theme request
+                    const isSage = themeId === 'matcha';
+                    const headerBgColor = activeTheme.headerBg || activeTheme.bg;
+                    const headerTextColor = activeTheme.headerText || activeTheme.text;
+
                     return (
                       <div 
                         key={colId} 
-                        className="w-[85vw] max-w-[340px] flex-shrink-0 flex flex-col snap-center rounded-[32px] border overflow-hidden transition-colors duration-300"
+                        className="w-[85vw] max-w-[340px] lg:w-full lg:max-w-none flex-shrink-0 flex flex-col snap-center rounded-[32px] border overflow-hidden transition-colors duration-300 shadow-sm"
                         style={{ backgroundColor: activeTheme.surface, borderColor: activeTheme.border }}
                       >
-                        <div className="px-5 py-4 flex items-center justify-between border-b transition-colors duration-300" style={{ borderColor: activeTheme.border, backgroundColor: activeTheme.bg }}>
+                        <div 
+                          className="px-5 py-4 flex items-center justify-between border-b transition-colors duration-300" 
+                          style={{ 
+                            borderColor: isSage ? 'rgba(255,255,255,0.1)' : activeTheme.border, 
+                            backgroundColor: headerBgColor 
+                          }}
+                        >
                           <div className="flex items-center gap-2">
-                            {colId === 'todo' && <Circle className="w-5 h-5" style={{ color: activeTheme.textMuted }} />}
-                            {colId === 'doing' && <CircleDashed className="w-5 h-5 animate-[spin_4s_linear_infinite]" style={{ color: activeTheme.primary }} />}
-                            {colId === 'done' && <CheckCircle2 className="w-5 h-5" style={{ color: '#188038' }} />}
-                            <h2 className="text-base font-medium capitalize" style={{ color: activeTheme.text }}>
+                            {colId === 'todo' && <Circle className="w-5 h-5" style={{ color: isSage ? '#a8c5b0' : activeTheme.textMuted }} />}
+                            {colId === 'doing' && <CircleDashed className="w-5 h-5 animate-[spin_4s_linear_infinite]" style={{ color: isSage ? '#81c784' : activeTheme.primary }} />}
+                            {colId === 'done' && <CheckCircle2 className="w-5 h-5" style={{ color: '#81c784' }} />}
+                            <h2 className="text-base font-semibold capitalize tracking-wide" style={{ color: headerTextColor }}>
                               {colId === 'todo' ? 'To Do' : colId}
                             </h2>
                           </div>
-                          <span className="text-sm font-medium px-2 py-0.5 rounded-full transition-colors duration-300" style={{ backgroundColor: activeTheme.border, color: activeTheme.text }}>
+                          <span 
+                            className="text-xs font-bold px-2.5 py-0.5 rounded-full transition-colors duration-300" 
+                            style={{ 
+                              backgroundColor: isSage ? 'rgba(255,255,255,0.15)' : activeTheme.border, 
+                              color: headerTextColor 
+                            }}
+                          >
                             {colTasks.length}
                           </span>
                         </div>
@@ -630,48 +742,106 @@
               </div>
             )}
 
-            {/* --- TAB 2: CALENDAR VIEW --- */}
+            {/* --- TAB 2: CALENDAR VIEW (Responsive Desktop Expansion) --- */}
             {activeTab === 'calendar' && (
-              <div className="h-full overflow-y-auto px-6 py-6 pb-32 hide-scrollbar flex items-start justify-center">
-                <div className="w-full max-w-sm rounded-[32px] p-4 shadow-xl" style={{ backgroundColor: activeTheme.primary, color: activeTheme.primaryText }}>
-                  <div className="flex items-center justify-between mb-4 px-2">
-                    <h2 className="font-semibold text-lg">Quest Schedule</h2>
-                    <div className="flex gap-2">
-                      <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))} className="p-1 rounded-full hover:bg-white/20">
-                        <ChevronLeft className="w-5 h-5"/>
-                      </button>
-                      <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))} className="p-1 rounded-full hover:bg-white/20">
-                        <ChevronRight className="w-5 h-5"/>
-                      </button>
-                    </div>
-                  </div>
+              <div className="h-full overflow-y-auto px-4 sm:px-8 py-6 pb-32 hide-scrollbar flex items-start justify-center">
+                <div className="w-full max-w-sm md:max-w-3xl lg:max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 transition-all duration-300">
+                  
+                  {/* Calendar Widget */}
+                  <div className="w-full rounded-[32px] p-5 sm:p-6 shadow-xl flex flex-col justify-between" style={{ backgroundColor: activeTheme.primary, color: activeTheme.primaryText }}>
+                    <div>
+                      <div className="flex items-center justify-between mb-4 px-2">
+                        <h2 className="font-semibold text-lg sm:text-xl">Quest Schedule</h2>
+                        <div className="flex gap-2">
+                          <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))} className="p-1.5 rounded-full hover:bg-white/20 transition-colors">
+                            <ChevronLeft className="w-5 h-5"/>
+                          </button>
+                          <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))} className="p-1.5 rounded-full hover:bg-white/20 transition-colors">
+                            <ChevronRight className="w-5 h-5"/>
+                          </button>
+                        </div>
+                      </div>
 
-                  <div className="rounded-[28px] p-5 shadow-inner" style={{ backgroundColor: activeTheme.card, color: activeTheme.text }}>
-                    <div className="flex justify-between items-center mb-6 font-semibold">
-                      <span className="text-lg">{currentMonth.toLocaleString('default', { month: 'short' })} {currentMonth.getFullYear()}</span>
+                      <div className="rounded-[28px] p-5 shadow-inner" style={{ backgroundColor: activeTheme.card, color: activeTheme.text }}>
+                        <div className="flex justify-between items-center mb-6 font-semibold">
+                          <span className="text-lg">{currentMonth.toLocaleString('default', { month: 'short' })} {currentMonth.getFullYear()}</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-7 gap-y-2 place-items-center mb-2">
+                          {['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'].map(day => (
+                            <div key={day} className="text-xs font-bold opacity-50">{day}</div>
+                          ))}
+                          {renderCalendarDays()}
+                        </div>
+                      </div>
                     </div>
-                    
-                    <div className="grid grid-cols-7 gap-y-2 place-items-center mb-2">
-                      {['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'].map(day => (
-                        <div key={day} className="text-xs font-bold opacity-50">{day}</div>
-                      ))}
-                      {renderCalendarDays()}
-                    </div>
-                    
+
                     <div className="mt-6 flex justify-between gap-3">
-                       <button onClick={() => setActiveTab('board')} className="flex-1 py-3 rounded-full font-bold text-sm transition-all active:scale-95 text-center" style={{ backgroundColor: activeTheme.primary, color: activeTheme.primaryText }}>
-                         View Quests
+                       <button onClick={() => setActiveTab('board')} className="flex-1 py-3 rounded-full font-bold text-sm transition-all active:scale-95 text-center shadow-sm" style={{ backgroundColor: activeTheme.card, color: activeTheme.text }}>
+                         View Board
                        </button>
                     </div>
                   </div>
+
+                  {/* Desktop / PC Selected Date Quests Panel */}
+                  <div className="w-full rounded-[32px] p-5 sm:p-6 shadow-md border flex flex-col" style={{ backgroundColor: activeTheme.surface, borderColor: activeTheme.border }}>
+                    <div className="flex items-center justify-between pb-4 border-b mb-4" style={{ borderColor: activeTheme.border }}>
+                      <div>
+                        <h3 className="font-bold text-base sm:text-lg" style={{ color: activeTheme.text }}>
+                          Quests for {new Date(selectedCalDate + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </h3>
+                        <p className="text-xs mt-0.5 font-medium" style={{ color: activeTheme.textMuted }}>
+                          {selectedDayTasks.length} {selectedDayTasks.length === 1 ? 'quest' : 'quests'} scheduled
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => { setNewTaskDate(selectedCalDate); setIsAdding(true); }}
+                        className="p-2 rounded-full border shadow-sm transition-transform active:scale-95"
+                        style={{ backgroundColor: activeTheme.card, borderColor: activeTheme.border, color: activeTheme.primary }}
+                      >
+                        <Plus className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[380px] hide-scrollbar">
+                      {selectedDayTasks.length === 0 ? (
+                        <div className="h-48 flex flex-col items-center justify-center gap-2 opacity-60" style={{ color: activeTheme.textMuted }}>
+                          <Check className="w-8 h-8 opacity-40" />
+                          <p className="text-sm font-medium">No quests scheduled for this day</p>
+                        </div>
+                      ) : (
+                        selectedDayTasks.map(t => (
+                          <div 
+                            key={t.id}
+                            className="p-3.5 px-4 rounded-[24px] border flex items-center justify-between shadow-sm"
+                            style={{ backgroundColor: activeTheme.card, borderColor: activeTheme.border }}
+                          >
+                            <span className={`text-sm font-medium ${t.status === 'done' ? 'line-through opacity-60' : ''}`} style={{ color: activeTheme.text }}>
+                              {t.text}
+                            </span>
+                            <span 
+                              className="text-[11px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider"
+                              style={{ 
+                                backgroundColor: t.status === 'done' ? '#188038' : t.status === 'doing' ? activeTheme.primary : activeTheme.border,
+                                color: t.status === 'done' ? '#ffffff' : t.status === 'doing' ? activeTheme.primaryText : activeTheme.text
+                              }}
+                            >
+                              {t.status}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
                 </div>
               </div>
             )}
 
-            {/* --- TAB 3: ACHIEVEMENTS & BADGES --- */}
+            {/* --- TAB 3: ACHIEVEMENTS & BADGES (Responsive Grid) --- */}
             {activeTab === 'achievements' && (
-              <div className="h-full overflow-y-auto px-6 py-6 pb-32 hide-scrollbar">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="h-full overflow-y-auto px-5 sm:px-8 py-6 pb-32 hide-scrollbar max-w-6xl mx-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {ACHIEVEMENTS.map((ach) => {
                     const statVal = stats[ach.type] || 0;
                     const isUnlocked = statVal >= ach.req;
@@ -711,7 +881,7 @@
           {(activeTab === 'board' || activeTab === 'calendar') && (
             <button
               onClick={() => setIsAdding(true)}
-              className="fixed bottom-8 right-6 w-16 h-16 rounded-full shadow-lg flex items-center justify-center transition-transform active:scale-90 z-40 border-4"
+              className="fixed bottom-8 right-6 w-16 h-16 rounded-full shadow-lg flex items-center justify-center transition-transform active:scale-90 z-40 border-4 hover:scale-105"
               style={{ backgroundColor: activeTheme.primary, color: activeTheme.primaryText, borderColor: activeTheme.bg }}
             >
               <Plus className="w-8 h-8" />
