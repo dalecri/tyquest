@@ -29,7 +29,7 @@
 
     body {
       font-family: var(--pixel-font);
-      background-color: var(--app-bg, #ebdccb);
+      background-color: var(--app-bg, #edd9c0);
       overscroll-behavior-y: none;
       transition: background-color 0.25s steps(4, end);
       -webkit-tap-highlight-color: transparent;
@@ -73,24 +73,19 @@
     /* Cute Retro Animations */
     @keyframes pixelBounce {
       0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-4px); }
+      50% { transform: translateY(-3px); }
     }
     .animate-pixel-bounce {
-      animation: pixelBounce 1s steps(2, start) infinite;
+      animation: pixelBounce 1.2s steps(2, start) infinite;
     }
 
     @keyframes floatXp {
       0% { transform: translate(-50%, 0) scale(0.8); opacity: 1; }
-      50% { transform: translate(-50%, -30px) scale(1.1); opacity: 1; }
-      100% { transform: translate(-50%, -55px) scale(1); opacity: 0; }
+      50% { transform: translate(-50%, -25px) scale(1.1); opacity: 1; }
+      100% { transform: translate(-50%, -50px) scale(1); opacity: 0; }
     }
     .animate-float-xp {
       animation: floatXp 1.2s ease-out forwards;
-    }
-
-    @keyframes scanline {
-      0% { transform: translateY(-100%); }
-      100% { transform: translateY(1000%); }
     }
 
     .pb-safe { 
@@ -102,9 +97,8 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useRef, Fragment } = React;
+    const { useState, useEffect, useRef, useMemo } = React;
 
-    // --- 8-Bit Web Audio Retro Sound Synthesizer (Zero External Dependencies) ---
     class RetroAudio {
       constructor() {
         this.ctx = null;
@@ -122,7 +116,6 @@
         if (this.muted) return;
         this.init();
         if (!this.ctx) return;
-        
         try {
           const osc = this.ctx.createOscillator();
           const gain = this.ctx.createGain();
@@ -135,7 +128,6 @@
 
           osc.connect(gain);
           gain.connect(this.ctx.destination);
-
           osc.start();
           osc.stop(this.ctx.currentTime + duration);
         } catch(e) {}
@@ -167,7 +159,7 @@
         this.init();
         if (!this.ctx) return;
         try {
-          const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99]; // C E G C E G
+          const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99];
           notes.forEach((freq, idx) => {
             const osc = this.ctx.createOscillator();
             const gain = this.ctx.createGain();
@@ -189,12 +181,7 @@
     const soundManager = new RetroAudio();
 
     const PixelIconBase = ({ children, className = "w-4 h-4" }) => (
-      <svg 
-        xmlns="http://www.w3.org/2000/svg" 
-        viewBox="0 0 24 24" 
-        fill="currentColor"
-        className={className}
-      >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className={className}>
         {children}
       </svg>
     );
@@ -285,15 +272,13 @@
           particles.forEach(p => {
             p.x += p.vx;
             p.y += p.vy;
-            p.vy += 0.35; // gravity
+            p.vy += 0.35;
             p.life -= 0.018;
 
             if (p.life > 0) {
               alive = true;
               ctx.fillStyle = p.color;
-              // Pixel-perfect square block
               ctx.fillRect(Math.floor(p.x), Math.floor(p.y), p.size, p.size);
-              // Dark retro pixel shadow
               ctx.fillStyle = 'rgba(0,0,0,0.5)';
               ctx.fillRect(Math.floor(p.x + 2), Math.floor(p.y + 2), p.size, 2);
             }
@@ -369,16 +354,28 @@
       }
     };
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    const yesterdayDate = new Date(Date.now() - 86400000);
+    const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+
     const tomorrowDate = new Date(Date.now() + 86400000);
     const tomorrowStr = tomorrowDate.toISOString().split('T')[0];
 
+    const DEFAULT_BOARDS = [
+      { id: 'all', name: 'All Quests', icon: '⚔️' },
+      { id: 'house', name: 'Housekeeping', icon: '🧹' },
+      { id: 'side', name: 'Side Quests', icon: '🔮' }
+    ];
+
     const INITIAL_TASKS = [
-      { id: 't1', text: 'Fold armor & organize chest', status: 'todo', xp: 50, dueDate: todayStr },
-      { id: 't2', text: 'Visit potion master (dentist)', status: 'todo', xp: 100, dueDate: tomorrowStr },
-      { id: 't3', text: 'Cook HP ration meals for week', status: 'doing', xp: 120, dueDate: todayStr },
-      { id: 't4', text: 'Pay electric crystal tax bill', status: 'done', xp: 80, dueDate: todayStr },
-      { id: 't5', text: 'Clean alchemy station', status: 'done', xp: 40, dueDate: todayStr },
+      { id: 't1', text: 'Fold armor & tidy chest', status: 'todo', xp: 50, dueDate: todayStr, boardId: 'house' },
+      { id: 't2', text: 'Visit potion master (dentist)', status: 'todo', xp: 100, dueDate: tomorrowStr, boardId: 'side' },
+      { id: 't3', text: 'Cook HP ration meals for week', status: 'doing', xp: 120, dueDate: todayStr, boardId: 'house' },
+      { id: 't4', text: 'Pay electric crystal tax bill', status: 'todo', xp: 80, dueDate: yesterdayStr, boardId: 'all' },
+      { id: 't5', text: 'Scrub alchemy station counters', status: 'done', xp: 40, dueDate: yesterdayStr, boardId: 'house' },
+      { id: 't6', text: 'Defeat laundry goblin mountain', status: 'todo', xp: 60, dueDate: todayStr, boardId: 'house' }
     ];
 
     const RETRO_ACHIEVEMENTS = [
@@ -394,17 +391,25 @@
 
     function App() {
       const [tasks, setTasks] = useState(INITIAL_TASKS);
+      const [boards, setBoards] = useState(DEFAULT_BOARDS);
+      const [activeBoardId, setActiveBoardId] = useState('all');
+      
       const [xp, setXp] = useState(380);
       const [gold, setGold] = useState(250);
       const [stats, setStats] = useState({ completed: 14, created: 22, maxDoing: 3, maxTodo: 7 });
       
-      const [activeTab, setActiveTab] = useState('board'); // 'board' | 'calendar' | 'achievements'
+      const [activeTab, setActiveTab] = useState('board'); // 'board' | 'list' | 'calendar' | 'achievements'
       const [isAdding, setIsAdding] = useState(false);
       const [newTaskText, setNewTaskText] = useState("");
       const [newTaskDate, setNewTaskDate] = useState("");
+      const [newTaskBoard, setNewTaskBoard] = useState("all");
+
+      const [isCreatingBoard, setIsCreatingBoard] = useState(false);
+      const [newBoardName, setNewBoardName] = useState("");
       
       const [themeKey, setThemeKey] = useState('snes16bit');
       const [isMuted, setIsMuted] = useState(false);
+      const [isSettingsOpen, setIsSettingsOpen] = useState(false);
       const [showCelebration, setShowCelebration] = useState(false);
       const [floatingXp, setFloatingXp] = useState(null);
       const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -412,29 +417,31 @@
 
       const activeTheme = RETRO_THEMES[themeKey] || RETRO_THEMES.snes16bit;
 
-      // RPG Calculations
       const level = Math.floor(xp / 200) + 1;
       const currentLevelXp = xp % 200;
       const xpPercent = Math.min(100, Math.round((currentLevelXp / 200) * 100));
 
       useEffect(() => {
-        const savedTasks = localStorage.getItem('tyquest_retro_tasks');
-        const savedXp = localStorage.getItem('tyquest_retro_xp');
-        const savedGold = localStorage.getItem('tyquest_retro_gold');
-        const savedTheme = localStorage.getItem('tyquest_retro_theme');
+        const savedTasks = localStorage.getItem('tyquest_retro_tasks_v2');
+        const savedBoards = localStorage.getItem('tyquest_retro_boards_v2');
+        const savedXp = localStorage.getItem('tyquest_retro_xp_v2');
+        const savedGold = localStorage.getItem('tyquest_retro_gold_v2');
+        const savedTheme = localStorage.getItem('tyquest_retro_theme_v2');
 
         if (savedTasks) try { setTasks(JSON.parse(savedTasks)); } catch(e) {}
+        if (savedBoards) try { setBoards(JSON.parse(savedBoards)); } catch(e) {}
         if (savedXp) setXp(parseInt(savedXp, 10));
         if (savedGold) setGold(parseInt(savedGold, 10));
         if (savedTheme && RETRO_THEMES[savedTheme]) setThemeKey(savedTheme);
       }, []);
 
       useEffect(() => {
-        localStorage.setItem('tyquest_retro_tasks', JSON.stringify(tasks));
-        localStorage.setItem('tyquest_retro_xp', xp.toString());
-        localStorage.setItem('tyquest_retro_gold', gold.toString());
-        localStorage.setItem('tyquest_retro_theme', themeKey);
-      }, [tasks, xp, gold, themeKey]);
+        localStorage.setItem('tyquest_retro_tasks_v2', JSON.stringify(tasks));
+        localStorage.setItem('tyquest_retro_boards_v2', JSON.stringify(boards));
+        localStorage.setItem('tyquest_retro_xp_v2', xp.toString());
+        localStorage.setItem('tyquest_retro_gold_v2', gold.toString());
+        localStorage.setItem('tyquest_retro_theme_v2', themeKey);
+      }, [tasks, boards, xp, gold, themeKey]);
 
       const toggleSound = () => {
         soundManager.muted = !isMuted;
@@ -448,12 +455,15 @@
 
         soundManager.playJump();
         const assignedDate = newTaskDate.trim() ? newTaskDate : todayStr;
+        const assignedBoard = newTaskBoard === 'all' && activeBoardId !== 'all' ? activeBoardId : newTaskBoard;
+
         const newTask = {
           id: Date.now().toString(),
           text: newTaskText.trim(),
           status: 'todo',
           xp: 50 + Math.floor(Math.random() * 30),
-          dueDate: assignedDate
+          dueDate: assignedDate,
+          boardId: assignedBoard
         };
 
         const nextTasks = [newTask, ...tasks];
@@ -469,6 +479,22 @@
         setIsAdding(false);
       };
 
+      const handleCreateBoard = (e) => {
+        e.preventDefault();
+        if (!newBoardName.trim()) return;
+        soundManager.playJump();
+        const newBoard = {
+          id: 'b_' + Date.now().toString(),
+          name: newBoardName.trim(),
+          icon: '📜'
+        };
+        const updatedBoards = [...boards, newBoard];
+        setBoards(updatedBoards);
+        setActiveBoardId(newBoard.id);
+        setNewBoardName("");
+        setIsCreatingBoard(false);
+      };
+
       const advanceTask = (task) => {
         let nextStatus = 'doing';
         if (task.status === 'todo') {
@@ -478,7 +504,6 @@
           nextStatus = 'done';
           soundManager.playVictoryFanfare();
           
-          // Reward XP and Gold!
           const gainXp = task.xp || 60;
           const gainGold = 25;
           setXp(x => x + gainXp);
@@ -512,6 +537,40 @@
         setTasks(tasks.filter(t => t.id !== id));
       };
 
+      const filteredTasks = useMemo(() => {
+        if (activeBoardId === 'all') return tasks;
+        return tasks.filter(t => t.boardId === activeBoardId || t.boardId === 'all');
+      }, [tasks, activeBoardId]);
+
+      const getDateCategory = (dateString) => {
+        if (!dateString) return 'NO DATE';
+        if (dateString < todayStr) return 'OVERDUE';
+        if (dateString === todayStr) return 'TODAY';
+        if (dateString === tomorrowStr) return 'TOMORROW';
+        return 'UPCOMING';
+      };
+
+      const groupTasksByDate = (taskList) => {
+        const categories = {
+          'OVERDUE': [],
+          'TODAY': [],
+          'TOMORROW': [],
+          'UPCOMING': [],
+          'NO DATE': []
+        };
+
+        taskList.forEach(task => {
+          const cat = getDateCategory(task.dueDate);
+          if (categories[cat]) {
+            categories[cat].push(task);
+          } else {
+            categories['UPCOMING'].push(task);
+          }
+        });
+
+        return categories;
+      };
+
       const columns = [
         { id: 'todo', label: 'QUEST LOG', subtitle: 'To Do', color: activeTheme.colTodo, badge: '📜 READY' },
         { id: 'doing', label: 'IN BATTLE', subtitle: 'Doing', color: activeTheme.colDoing, badge: '⚔️ ACTIVE' },
@@ -527,92 +586,103 @@
             '--app-bg': activeTheme.bg 
           }}
         >
-          {/* Confetti Animation Canvas */}
           <PixelConfetti active={showCelebration} />
 
+          {/* Fixed Sticky Top Header */}
           <header 
-            className="p-3 sm:p-4 pixel-box m-2 sm:m-4 mb-0 flex flex-col gap-2 relative z-10"
+            className="sticky top-0 z-30 p-2 sm:p-3 pixel-box m-2 sm:m-3 mb-0 flex flex-col gap-1.5 shadow-md"
             style={{ backgroundColor: activeTheme.hudBg, color: activeTheme.hudText }}
           >
             <div className="flex justify-between items-center">
+              {/* Hero Status Line */}
               <div className="flex items-center gap-2">
-                {/* Cute Pixel Mascot */}
-                <div className="w-8 h-8 rounded-none border-2 border-white/40 flex items-center justify-center bg-black/40 text-sm animate-pixel-bounce">
+                <div className="w-6 h-6 rounded-none border border-white/40 flex items-center justify-center bg-black/40 text-xs animate-pixel-bounce">
                   👾
                 </div>
                 <div>
-                  <h1 className="text-sm sm:text-base font-arcade tracking-wider text-amber-300">
-                    TyQuest
-                  </h1>
-                  <p className="text-[10px] sm:text-xs opacity-75 font-pixel">
+                  <h1 className="text-[10px] sm:text-xs font-arcade tracking-wide text-amber-300">
                     LVL {level} HERO • TYLER
-                  </p>
+                  </h1>
                 </div>
               </div>
 
-              {/* Gold & Sound Controls */}
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="px-2 py-1 bg-black/40 border border-white/20 text-[11px] sm:text-xs flex items-center gap-1.5 font-arcade text-yellow-300">
-                  <PixelCoin className="w-3.5 h-3.5 text-yellow-400" />
+              {/* Top Right: Half-Sized Gold & Icon Nav */}
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                {/* Half-sized Gold Coin Badge */}
+                <div className="px-1.5 py-0.5 bg-black/50 border border-white/20 text-[9px] flex items-center gap-1 font-arcade text-yellow-300 scale-90">
+                  <PixelCoin className="w-2.5 h-2.5 text-yellow-400" />
                   <span>{gold}G</span>
                 </div>
 
-                <button 
-                  onClick={toggleSound}
-                  className="p-1.5 px-2 bg-black/40 border border-white/20 text-xs font-arcade hover:bg-black/60 transition-colors"
-                  title="Toggle 8-bit sound"
-                >
-                  {isMuted ? '🔇' : '🔊'}
-                </button>
-
-                {/* Theme Selector */}
-                <select 
-                  value={themeKey} 
-                  onChange={(e) => { soundManager.playBlip(400); setThemeKey(e.target.value); }}
-                  className="bg-black/50 border border-white/20 text-[10px] sm:text-xs px-2 py-1 font-pixel text-white focus:outline-none"
-                >
-                  <option value="snes16bit">16-BIT</option>
-                  <option value="gameboy">GAMEBOY</option>
-                  <option value="cyberArcade">NEON</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 items-center pt-1 border-t border-white/10">
-              {/* XP Gauge */}
-              <div className="flex items-center gap-2 text-[10px] sm:text-xs">
-                <span className="font-arcade text-cyan-300">EXP:</span>
-                <div className="flex-1 h-3 bg-black/60 border border-white/30 p-0.5 overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 transition-all duration-300"
-                    style={{ width: `${xpPercent}%` }}
-                  />
+                {/* Minimal Icon-Only Nav Buttons */}
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => { soundManager.playBlip(500); setActiveTab('board'); }}
+                    className={`w-7 h-7 flex items-center justify-center text-xs font-arcade transition-all pixel-box-sm ${activeTab === 'board' ? 'bg-amber-400 text-black' : 'bg-black/40 text-white/80 hover:text-white'}`}
+                    title="Kanban Board View"
+                  >
+                    ⚔️
+                  </button>
+                  <button
+                    onClick={() => { soundManager.playBlip(520); setActiveTab('list'); }}
+                    className={`w-7 h-7 flex items-center justify-center text-xs font-arcade transition-all pixel-box-sm ${activeTab === 'list' ? 'bg-amber-400 text-black' : 'bg-black/40 text-white/80 hover:text-white'}`}
+                    title="Google Tasks List View"
+                  >
+                    📝
+                  </button>
+                  <button
+                    onClick={() => { soundManager.playBlip(550); setActiveTab('calendar'); }}
+                    className={`w-7 h-7 flex items-center justify-center text-xs font-arcade transition-all pixel-box-sm ${activeTab === 'calendar' ? 'bg-amber-400 text-black' : 'bg-black/40 text-white/80 hover:text-white'}`}
+                    title="Quest Radar"
+                  >
+                    📅
+                  </button>
+                  <button
+                    onClick={() => { soundManager.playBlip(600); setActiveTab('achievements'); }}
+                    className={`w-7 h-7 flex items-center justify-center text-xs font-arcade transition-all pixel-box-sm ${activeTab === 'achievements' ? 'bg-amber-400 text-black' : 'bg-black/40 text-white/80 hover:text-white'}`}
+                    title="Relics & Badges"
+                  >
+                    🏆
+                  </button>
                 </div>
-                <span className="font-arcade text-[9px] opacity-80">{currentLevelXp}/200</span>
-              </div>
-
-              {/* View Switchers */}
-              <div className="flex justify-end gap-1.5">
-                <button
-                  onClick={() => { soundManager.playBlip(500); setActiveTab('board'); }}
-                  className={`px-3 py-1 text-[10px] font-arcade transition-all ${activeTab === 'board' ? 'bg-amber-400 text-black shadow-[2px_2px_0_#000]' : 'bg-black/40 text-white/70 hover:text-white'}`}
-                >
-                  ⚔️ BOARDS
-                </button>
-                <button
-                  onClick={() => { soundManager.playBlip(550); setActiveTab('calendar'); }}
-                  className={`px-3 py-1 text-[10px] font-arcade transition-all ${activeTab === 'calendar' ? 'bg-amber-400 text-black shadow-[2px_2px_0_#000]' : 'bg-black/40 text-white/70 hover:text-white'}`}
-                >
-                  📅 RADAR
-                </button>
-                <button
-                  onClick={() => { soundManager.playBlip(600); setActiveTab('achievements'); }}
-                  className={`px-3 py-1 text-[10px] font-arcade transition-all ${activeTab === 'achievements' ? 'bg-amber-400 text-black shadow-[2px_2px_0_#000]' : 'bg-black/40 text-white/70 hover:text-white'}`}
-                >
-                  🏆 RELICS
-                </button>
               </div>
             </div>
+
+            {/* Compact XP Gauge */}
+            <div className="flex items-center gap-2 text-[9px] pt-1 border-t border-white/10">
+              <span className="font-arcade text-cyan-300 text-[8px]">EXP:</span>
+              <div className="flex-1 h-2 bg-black/60 border border-white/30 p-0.5 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 transition-all duration-300"
+                  style={{ width: `${xpPercent}%` }}
+                />
+              </div>
+              <span className="font-arcade text-[8px] opacity-80">{currentLevelXp}/200</span>
+            </div>
+
+            {/* Google Tasks Board Switcher Strip */}
+            {(activeTab === 'board' || activeTab === 'list') && (
+              <div className="flex items-center gap-1.5 overflow-x-auto hide-scrollbar pt-1 border-t border-white/10 text-[9px] font-arcade">
+                <span className="text-[8px] opacity-70 flex-shrink-0">BOARD:</span>
+                {boards.map(b => (
+                  <button
+                    key={b.id}
+                    onClick={() => { soundManager.playBlip(420); setActiveBoardId(b.id); }}
+                    className={`px-2 py-0.5 flex-shrink-0 pixel-box-sm transition-transform active:scale-95 flex items-center gap-1 ${activeBoardId === b.id ? 'bg-amber-300 text-black font-bold' : 'bg-black/30 text-white/70 hover:text-white'}`}
+                  >
+                    <span>{b.icon}</span>
+                    <span>{b.name.toUpperCase()}</span>
+                  </button>
+                ))}
+                <button
+                  onClick={() => { soundManager.playBlip(480); setIsCreatingBoard(true); }}
+                  className="px-2 py-0.5 flex-shrink-0 pixel-box-sm bg-emerald-400 text-black font-bold hover:bg-emerald-300"
+                  title="Create New Board"
+                >
+                  + NEW
+                </button>
+              </div>
+            )}
           </header>
 
           <main className="flex-1 overflow-hidden relative p-2 sm:p-4">
@@ -622,7 +692,8 @@
               <div className="flex h-full overflow-x-auto lg:overflow-x-visible snap-x snap-mandatory hide-scrollbar lg:justify-center">
                 <div className="flex lg:grid lg:grid-cols-3 gap-3 sm:gap-4 h-full min-w-max lg:min-w-0 lg:w-full lg:max-w-6xl">
                   {columns.map(col => {
-                    const colTasks = tasks.filter(t => t.status === col.id);
+                    const colTasks = filteredTasks.filter(t => t.status === col.id);
+                    const grouped = groupTasksByDate(colTasks);
 
                     return (
                       <div 
@@ -640,9 +711,9 @@
                           </span>
                         </div>
 
-                        {/* Quest Items Container */}
+                        {/* Quest Items Container with Minimal Date Subheaders */}
                         <div 
-                          className="flex-1 overflow-y-auto hide-scrollbar p-3 space-y-2.5"
+                          className="flex-1 overflow-y-auto hide-scrollbar p-3 space-y-3"
                           style={{ backgroundColor: activeTheme.windowBg }}
                         >
                           {colTasks.length === 0 ? (
@@ -651,52 +722,68 @@
                               <p>NO QUESTS ACTIVE</p>
                             </div>
                           ) : (
-                            colTasks.map(task => (
-                              <div 
-                                key={task.id}
-                                className="pixel-box-sm p-3 flex flex-col gap-2 transition-transform hover:-translate-y-0.5"
-                                style={{ backgroundColor: activeTheme.tagBg }}
-                              >
-                                <div className="flex items-start justify-between gap-2">
-                                  {/* Custom Checkbox Button */}
-                                  <button
-                                    onClick={() => advanceTask(task)}
-                                    className="w-6 h-6 flex-shrink-0 pixel-box-sm flex items-center justify-center text-xs font-arcade transition-colors active:scale-90"
-                                    style={{ 
-                                      backgroundColor: task.status === 'done' ? '#10b981' : task.status === 'doing' ? '#3b82f6' : '#ffffff',
-                                      color: task.status === 'done' ? '#ffffff' : '#000000'
-                                    }}
-                                    title="Advance quest status"
-                                  >
-                                    {task.status === 'done' ? '✓' : task.status === 'doing' ? '⚔' : ''}
-                                  </button>
+                            ['OVERDUE', 'TODAY', 'TOMORROW', 'UPCOMING', 'NO DATE'].map(sublabel => {
+                              const subTasks = grouped[sublabel] || [];
+                              if (subTasks.length === 0) return null;
 
-                                  <div className="flex-1 min-w-0">
-                                    <p className={`text-xs font-pixel leading-snug break-words ${task.status === 'done' ? 'line-through opacity-50' : 'font-bold'}`}>
-                                      {task.text}
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-1.5 text-[10px] font-arcade">
-                                      <span className="text-amber-700 bg-amber-200 px-1 py-0.5 border border-amber-800">
-                                        +{task.xp || 50}XP
-                                      </span>
-                                      {task.dueDate && (
-                                        <span className="opacity-70 font-pixel text-[11px]">
-                                          📅 {task.dueDate === todayStr ? 'TODAY' : task.dueDate}
-                                        </span>
-                                      )}
-                                    </div>
+                              return (
+                                <div key={sublabel} className="space-y-1.5">
+                                  {/* Minimal Google Tasks Sublabel */}
+                                  <div className="flex items-center gap-2 px-1">
+                                    <span className={`text-[9px] font-arcade tracking-wider font-bold ${sublabel === 'OVERDUE' ? 'text-red-600' : sublabel === 'TODAY' ? 'text-amber-800' : 'text-slate-500'}`}>
+                                      • {sublabel}
+                                    </span>
+                                    <div className="h-[1px] flex-1 bg-black/10"></div>
                                   </div>
 
-                                  <button
-                                    onClick={() => deleteTask(task.id)}
-                                    className="opacity-40 hover:opacity-100 p-1 hover:text-red-600 transition-opacity"
-                                    title="Abandon Quest"
-                                  >
-                                    <PixelTrash className="w-3.5 h-3.5" />
-                                  </button>
+                                  {subTasks.map(task => (
+                                    <div 
+                                      key={task.id}
+                                      className="pixel-box-sm p-2.5 flex flex-col gap-1.5 transition-transform hover:-translate-y-0.5"
+                                      style={{ backgroundColor: activeTheme.tagBg }}
+                                    >
+                                      <div className="flex items-start justify-between gap-2">
+                                        <button
+                                          onClick={() => advanceTask(task)}
+                                          className="w-5 h-5 flex-shrink-0 pixel-box-sm flex items-center justify-center text-[10px] font-arcade transition-colors active:scale-90"
+                                          style={{ 
+                                            backgroundColor: task.status === 'done' ? '#10b981' : task.status === 'doing' ? '#3b82f6' : '#ffffff',
+                                            color: task.status === 'done' ? '#ffffff' : '#000000'
+                                          }}
+                                          title="Advance quest status"
+                                        >
+                                          {task.status === 'done' ? '✓' : task.status === 'doing' ? '⚔' : ''}
+                                        </button>
+
+                                        <div className="flex-1 min-w-0">
+                                          <p className={`text-xs font-pixel leading-snug break-words ${task.status === 'done' ? 'line-through opacity-50' : 'font-bold'}`}>
+                                            {task.text}
+                                          </p>
+                                          <div className="flex items-center gap-2 mt-1 text-[9px] font-arcade">
+                                            <span className="text-amber-800 bg-amber-200 px-1 py-0.5 border border-amber-800">
+                                              +{task.xp || 50}XP
+                                            </span>
+                                            {task.dueDate && (
+                                              <span className="opacity-70 font-pixel text-[10px]">
+                                                📅 {task.dueDate === todayStr ? 'TODAY' : task.dueDate}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <button
+                                          onClick={() => deleteTask(task.id)}
+                                          className="opacity-40 hover:opacity-100 p-1 hover:text-red-600 transition-opacity"
+                                          title="Abandon Quest"
+                                        >
+                                          <PixelTrash className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
-                              </div>
-                            ))
+                              );
+                            })
                           )}
                         </div>
 
@@ -707,6 +794,101 @@
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'list' && (
+              <div className="h-full overflow-y-auto p-2 sm:p-4 hide-scrollbar flex justify-center">
+                <div className="w-full max-w-lg pixel-box p-4 flex flex-col gap-3" style={{ backgroundColor: activeTheme.windowBg }}>
+                  <div className="flex items-center justify-between border-b-4 border-[#1a1528] pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">📜</span>
+                      <h2 className="font-arcade text-xs text-amber-900">
+                        {boards.find(b => b.id === activeBoardId)?.name.toUpperCase() || 'QUESTS'}
+                      </h2>
+                    </div>
+                    <span className="font-arcade text-[9px] px-2 py-0.5 bg-black/10 border border-[#1a1528]">
+                      {filteredTasks.filter(t => t.status !== 'done').length} ACTIVE
+                    </span>
+                  </div>
+
+                  {/* Grouped Google Tasks Style List */}
+                  <div className="space-y-4">
+                    {['OVERDUE', 'TODAY', 'TOMORROW', 'UPCOMING', 'NO DATE'].map(sublabel => {
+                      const activeSubTasks = filteredTasks.filter(t => t.status !== 'done' && getDateCategory(t.dueDate) === sublabel);
+                      if (activeSubTasks.length === 0) return null;
+
+                      return (
+                        <div key={sublabel} className="space-y-2">
+                          <div className="flex items-center gap-2 px-1">
+                            <span className={`text-[10px] font-arcade font-bold ${sublabel === 'OVERDUE' ? 'text-red-600' : sublabel === 'TODAY' ? 'text-amber-800' : 'text-slate-500'}`}>
+                              {sublabel}
+                            </span>
+                            <div className="h-[1px] flex-1 bg-black/15"></div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            {activeSubTasks.map(task => (
+                              <div
+                                key={task.id}
+                                className="pixel-box-sm p-2.5 flex items-center justify-between gap-2.5"
+                                style={{ backgroundColor: activeTheme.tagBg }}
+                              >
+                                <button
+                                  onClick={() => advanceTask(task)}
+                                  className="w-5 h-5 pixel-box-sm flex items-center justify-center text-[10px] font-arcade bg-white active:scale-90"
+                                >
+                                  {task.status === 'doing' ? '⚔' : ''}
+                                </button>
+
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-pixel font-bold leading-tight">{task.text}</p>
+                                  <div className="flex items-center gap-2 text-[9px] font-arcade opacity-75 mt-0.5">
+                                    <span>+{task.xp || 50}XP</span>
+                                    <span>•</span>
+                                    <span>{task.dueDate}</span>
+                                  </div>
+                                </div>
+
+                                <button
+                                  onClick={() => deleteTask(task.id)}
+                                  className="opacity-40 hover:opacity-100 p-1 hover:text-red-600"
+                                >
+                                  <PixelTrash className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Completed Section */}
+                    {filteredTasks.filter(t => t.status === 'done').length > 0 && (
+                      <div className="pt-2 border-t-2 border-dashed border-[#1a1528]/30 space-y-2">
+                        <span className="text-[10px] font-arcade text-emerald-800 font-bold block">
+                          ✓ COMPLETED ({filteredTasks.filter(t => t.status === 'done').length})
+                        </span>
+                        <div className="space-y-1.5">
+                          {filteredTasks.filter(t => t.status === 'done').map(task => (
+                            <div key={task.id} className="pixel-box-sm p-2 flex items-center justify-between bg-black/5 opacity-60">
+                              <button
+                                onClick={() => advanceTask(task)}
+                                className="w-4 h-4 pixel-box-sm bg-emerald-500 text-white flex items-center justify-center text-[8px]"
+                              >
+                                ✓
+                              </button>
+                              <span className="flex-1 px-2 font-pixel text-xs line-through">{task.text}</span>
+                              <button onClick={() => deleteTask(task.id)} className="opacity-40 hover:opacity-100 p-1">
+                                <PixelTrash className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -760,59 +942,75 @@
                     })}
                   </div>
 
-                  <div className="border-t-4 border-[#1a1528] pt-3">
-                    <h3 className="font-arcade text-[10px] mb-2 text-slate-700">
-                      QUEUED FOR {selectedCalDate}:
-                    </h3>
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto hide-scrollbar">
-                      {tasks.filter(t => t.dueDate === selectedCalDate).length === 0 ? (
-                        <p className="text-xs font-pixel opacity-60 text-center py-2">NO QUEST DEADLINES TODAY</p>
-                      ) : (
-                        tasks.filter(t => t.dueDate === selectedCalDate).map(t => (
-                          <div key={t.id} className="p-2 pixel-box-sm bg-white flex justify-between items-center text-xs font-pixel">
-                            <span className={t.status === 'done' ? 'line-through opacity-50' : ''}>{t.text}</span>
-                            <span className="font-arcade text-[9px] px-1.5 py-0.5 bg-black text-white">{t.status.toUpperCase()}</span>
-                          </div>
-                        ))
-                      )}
+                  {/* Selected Date Quest Preview */}
+                  <div className="border-t-2 border-[#1a1528] pt-3">
+                    <div className="font-arcade text-[10px] text-slate-700 mb-2">
+                      QUESTS FOR {selectedCalDate === todayStr ? 'TODAY' : selectedCalDate}:
                     </div>
+                    {tasks.filter(t => t.dueDate === selectedCalDate).length === 0 ? (
+                      <div className="text-center py-2 font-pixel text-xs text-slate-500 opacity-70">
+                        No quests scheduled for this date.
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5 max-h-36 overflow-y-auto hide-scrollbar">
+                        {tasks.filter(t => t.dueDate === selectedCalDate).map(t => (
+                          <div key={t.id} className="p-2 pixel-box-sm bg-white flex items-center justify-between text-xs font-pixel">
+                            <span className={t.status === 'done' ? 'line-through opacity-50' : 'font-bold'}>{t.text}</span>
+                            <span className="text-[9px] font-arcade px-1 bg-amber-100 border border-[#1a1528]">{t.status.toUpperCase()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             )}
 
+            {/* --- TAB 4: RELICS & ACHIEVEMENTS --- */}
             {activeTab === 'achievements' && (
-              <div className="h-full overflow-y-auto p-2 sm:p-4 hide-scrollbar max-w-5xl mx-auto">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {RETRO_ACHIEVEMENTS.map(ach => {
-                    const val = stats[ach.type] || 0;
-                    const unlocked = val >= ach.req;
-                    const Icon = ach.icon;
+              <div className="h-full overflow-y-auto p-2 sm:p-4 hide-scrollbar flex justify-center">
+                <div className="w-full max-w-xl space-y-3">
+                  <div className="pixel-box p-3 text-center" style={{ backgroundColor: activeTheme.windowBg }}>
+                    <h2 className="font-arcade text-xs text-amber-900 mb-1">🏆 HALL OF RELICS</h2>
+                    <p className="font-pixel text-[11px] text-slate-600">
+                      Completed {stats.completed} quests • Created {stats.created} quests
+                    </p>
+                  </div>
 
-                    return (
-                      <div 
-                        key={ach.id}
-                        className={`pixel-box p-3 flex items-center gap-3 transition-all ${unlocked ? 'bg-amber-100 text-slate-900' : 'bg-slate-300 text-slate-500 opacity-60'}`}
-                      >
-                        <div className={`w-10 h-10 pixel-box-sm flex items-center justify-center flex-shrink-0 ${unlocked ? 'bg-amber-400' : 'bg-slate-400'}`}>
-                          <Icon className="w-5 h-5 text-black" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {RETRO_ACHIEVEMENTS.map(ach => {
+                      const statVal = stats[ach.type] || 0;
+                      const isUnlocked = statVal >= ach.req;
+                      const IconComponent = ach.icon;
+
+                      return (
+                        <div
+                          key={ach.id}
+                          className={`pixel-box-sm p-3 flex items-center gap-3 transition-all ${isUnlocked ? 'bg-amber-100' : 'opacity-45 bg-slate-200'}`}
+                          style={{ backgroundColor: isUnlocked ? activeTheme.tagBg : undefined }}
+                        >
+                          <div className={`w-9 h-9 pixel-box-sm flex items-center justify-center flex-shrink-0 ${isUnlocked ? 'bg-amber-300' : 'bg-slate-300'}`}>
+                            <IconComponent className="w-5 h-5 text-slate-900" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-arcade text-[10px] truncate text-slate-900">{ach.title}</div>
+                            <div className="font-pixel text-[11px] text-slate-600 leading-tight">{ach.desc}</div>
+                            <div className="font-arcade text-[8px] mt-1 text-slate-500">
+                              {Math.min(statVal, ach.req)} / {ach.req} {isUnlocked ? '✨ UNLOCKED' : ''}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-arcade text-xs text-amber-900">{ach.title}</h4>
-                          <p className="font-pixel text-xs mt-0.5">{ach.desc}</p>
-                        </div>
-                        <div className="font-arcade text-[10px] font-bold">
-                          {unlocked ? '🏆 UNLOCKED' : `${val}/${ach.req}`}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
+
           </main>
 
-          {activeTab === 'board' && (
+          {/* Floating Action Button for Adding Tasks */}
+          {(activeTab === 'board' || activeTab === 'list') && (
             <button
               onClick={() => { soundManager.playJump(); setIsAdding(true); }}
               className="fixed bottom-6 right-6 w-14 h-14 pixel-btn bg-amber-400 text-black flex items-center justify-center z-40 text-xl font-bold"
@@ -822,7 +1020,58 @@
             </button>
           )}
 
-          {/* New Quest Modal */}
+          {/* Floating Minimal Sound & Theme Module */}
+          <div className="fixed bottom-6 left-6 z-40 flex flex-col items-start gap-2">
+            {isSettingsOpen && (
+              <div 
+                className="pixel-box p-2.5 flex flex-col gap-2 animate-pixel-bounce shadow-xl"
+                style={{ backgroundColor: activeTheme.windowBg }}
+              >
+                <div className="flex items-center justify-between gap-3 text-[9px] font-arcade border-b-2 border-[#1a1528] pb-1">
+                  <span>SETTINGS</span>
+                  <button 
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="text-red-500 font-bold px-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                {/* Audio Toggle */}
+                <button 
+                  onClick={toggleSound}
+                  className="pixel-btn px-2 py-1 bg-amber-200 text-[9px] font-arcade flex items-center justify-between gap-2"
+                >
+                  <span>SOUND</span>
+                  <span>{isMuted ? 'OFF 🔇' : 'ON 🔊'}</span>
+                </button>
+
+                {/* Theme Selector */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-[8px] font-arcade opacity-75">THEME:</span>
+                  <select 
+                    value={themeKey} 
+                    onChange={(e) => { soundManager.playBlip(400); setThemeKey(e.target.value); }}
+                    className="bg-white border-2 border-[#1a1528] text-[9px] px-1.5 py-1 font-pixel text-black focus:outline-none"
+                  >
+                    <option value="snes16bit">16-BIT</option>
+                    <option value="gameboy">GAMEBOY</option>
+                    <option value="cyberArcade">NEON</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => { soundManager.playBlip(450); setIsSettingsOpen(!isSettingsOpen); }}
+              className="w-10 h-10 pixel-btn bg-slate-900 text-white flex items-center justify-center text-sm shadow-md"
+              title="Audio & Theme Settings"
+            >
+              ⚙️
+            </button>
+          </div>
+
+          {/* Modal: New Quest */}
           {isAdding && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
               <div className="w-full max-w-sm pixel-box p-5 animate-pixel-bounce" style={{ backgroundColor: activeTheme.windowBg }}>
@@ -853,6 +1102,20 @@
                     />
                   </div>
 
+                  <div>
+                    <label className="block font-arcade text-[9px] mb-1 opacity-80">ASSIGN TO BOARD:</label>
+                    <select
+                      value={newTaskBoard}
+                      onChange={(e) => setNewTaskBoard(e.target.value)}
+                      className="w-full p-2 pixel-box-sm bg-white font-pixel text-xs focus:outline-none"
+                    >
+                      <option value="all">⭐ General / All Boards</option>
+                      {boards.filter(b => b.id !== 'all').map(b => (
+                        <option key={b.id} value={b.id}>{b.icon} {b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div className="flex justify-end gap-2 pt-2">
                     <button
                       type="button"
@@ -867,6 +1130,46 @@
                       className="pixel-btn px-4 py-2 bg-emerald-400 text-black font-arcade text-[10px] disabled:opacity-50"
                     >
                       ACCEPT QUEST!
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Modal: Create New Board */}
+          {isCreatingBoard && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+              <div className="w-full max-w-sm pixel-box p-5 animate-pixel-bounce" style={{ backgroundColor: activeTheme.windowBg }}>
+                <h3 className="font-arcade text-xs mb-3 text-amber-900 flex items-center gap-2">
+                  <span>📜</span> CREATE NEW BOARD
+                </h3>
+                <form onSubmit={handleCreateBoard} className="space-y-3">
+                  <div>
+                    <label className="block font-arcade text-[9px] mb-1 opacity-80">BOARD NAME:</label>
+                    <input
+                      type="text"
+                      autoFocus
+                      value={newBoardName}
+                      onChange={(e) => setNewBoardName(e.target.value)}
+                      placeholder="e.g. Work, Studio, Yardwork..."
+                      className="w-full p-2.5 pixel-box-sm bg-white font-pixel text-xs focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatingBoard(false)}
+                      className="pixel-btn px-3 py-1.5 bg-slate-300 font-arcade text-[10px]"
+                    >
+                      CANCEL
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!newBoardName.trim()}
+                      className="pixel-btn px-4 py-1.5 bg-amber-400 text-black font-arcade text-[10px] disabled:opacity-50"
+                    >
+                      CREATE
                     </button>
                   </div>
                 </form>
