@@ -48,9 +48,8 @@
             border-radius: 2px;
         }
 
-        /* Fallbacks added to support standard device emojis */
-        .font-arcade { font-family: 'Silkscreen', system-ui, -apple-system, sans-serif; }
-        .font-sans { font-family: 'Silkscreen', system-ui, -apple-system, sans-serif; }
+        .font-arcade { font-family: 'Silkscreen', cursive, system-ui, sans-serif; }
+        .font-sans { font-family: 'Silkscreen', cursive, system-ui, sans-serif; }
 
         @keyframes float {
             0% { transform: translateY(0px); }
@@ -130,10 +129,10 @@
                 bg: '#05010a', windowBg: '#130424', hudBg: '#090114', hudText: '#00ffff',
                 border: '#ff007f', primary: '#00ffff', colTodo: '#ff0055', colDoing: '#b300ff', colDone: '#00ffaa', tagBg: '#2b0b4a'
             },
-            cozyCafe: {
-                id: 'cozyCafe', name: 'Mexican Cafe', isDark: false, cost: 250,
-                bg: '#e8cfa6', windowBg: '#f7ead2', hudBg: '#592e1e', hudText: '#f7ead2',
-                border: '#3d1b11', primary: '#c95e34', colTodo: '#d97d43', colDoing: '#b86637', colDone: '#8f4f2c', tagBg: '#f0d8b6'
+            mexicanCafe: {
+                id: 'mexicanCafe', name: 'Mexican Cafe', isDark: false, cost: 250,
+                bg: '#dfb182', windowBg: '#f2e3cb', hudBg: '#592c1a', hudText: '#f2e3cb',
+                border: '#36180c', primary: '#b8522b', colTodo: '#d97d43', colDoing: '#c26636', colDone: '#8f4f2c', tagBg: '#e6ccb2'
             }
         };
 
@@ -147,6 +146,13 @@
             { id: 'r7', name: 'Buy Hobby Supplies ($20 Limit)', cost: 500 },
             { id: 'r8', name: 'Takeout Dinner of Choice', cost: 400 }
         ];
+
+        const GoldBadge = ({ amount }) => (
+            <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-500 text-black pixel-box-sm text-xs font-bold shadow-sm">
+                <span className="w-2.5 h-2.5 bg-yellow-300 border border-yellow-800 rounded-full inline-block"></span>
+                <span>{amount}G</span>
+            </div>
+        );
 
         const HeroAvatar = () => (
             <svg width="40" height="40" viewBox="0 0 16 16" className="pixel-box bg-[#87CEEB]" style={{ borderColor: 'var(--app-border)' }}>
@@ -267,7 +273,6 @@
         function App() {
             const [isDataLoaded, setIsDataLoaded] = useState(false);
             
-            // Dummy Data Initialization
             const initialTasks = [
                 { id: 't1', text: 'Slay the laundry dragon', status: 'todo', boardId: 'house', dueDate: getTodayStr(), subtasks: [{id: 's1', text: 'Wash clothes', done: true}, {id: 's2', text: 'Fold and put away', done: false}] },
                 { id: 't2', text: 'Visit Potion Master (Dentist)', status: 'todo', boardId: 'general', dueDate: getTomorrowStr(), subtasks: [] },
@@ -288,8 +293,8 @@
             ];
 
             const initialLibraryItems = [
-                { id: 'l1', text: 'Stardew Valley 1.6 Update', categoryId: 'games' },
-                { id: 'l2', text: 'Dune Messiah', categoryId: 'books' }
+                { id: 'l1', text: 'Stardew Valley 1.6 Update', categoryId: 'games', done: false },
+                { id: 'l2', text: 'Dune Messiah', categoryId: 'books', done: false }
             ];
 
             const [tasks, setTasks] = useState([]);
@@ -328,11 +333,11 @@
                 setLevel(Math.floor(xp / 100) + 1);
             }, [xp]);
 
-            // Mobile Drag Polyfill Setup
+            // Mobile Drag Polyfill Setup (Increased speed by 15%: holdToDrag 255ms instead of 300ms)
             useEffect(() => {
                 if (window.MobileDragDrop) {
                     window.MobileDragDrop.polyfill({
-                        holdToDrag: 300 // 300ms hold ensures touch scroll works normally
+                        holdToDrag: 255 
                     });
                     window.addEventListener('touchmove', function() {}, {passive: false});
                 }
@@ -409,7 +414,6 @@
             };
 
             const handleToggleTaskStatus = (task) => {
-                // Prevent un-doing tasks directly
                 if (task.status === 'done') return;
 
                 let nextStatus = 'doing';
@@ -444,7 +448,6 @@
 
             const handleToggleSubtask = (taskId, subIdx) => {
                 setTasks(tasks.map(t => {
-                    // Prevent toggling if main task is done
                     if (t.id !== taskId || t.status === 'done') return t;
                     const newSubs = [...t.subtasks];
                     const wasDone = newSubs[subIdx].done;
@@ -550,10 +553,16 @@
                 const newItem = {
                     id: 'l_'+Date.now(),
                     text,
-                    categoryId: categoryId === 'all' ? (libraryCategories[1]?.id || 'misc') : categoryId
+                    categoryId: categoryId === 'all' ? (libraryCategories[1]?.id || 'misc') : categoryId,
+                    done: false
                 };
                 setLibraryItems([newItem, ...libraryItems]);
                 sound.playBlip(600);
+            };
+
+            const handleToggleLibraryItem = (itemId) => {
+                setLibraryItems(libraryItems.map(i => i.id === itemId ? { ...i, done: !i.done } : i));
+                sound.playBlip(650);
             };
 
             const handleDeleteLibraryItem = (id) => {
@@ -633,8 +642,7 @@
 
                                 <div className="flex items-center gap-4">
                                     <div className="flex items-center gap-1.5 px-2">
-                                        <div className="w-3 h-3 bg-yellow-400 border border-black pixel-box-sm flex-shrink-0"></div>
-                                        <span className="text-xs text-yellow-400">{Number.isNaN(gold) ? 0 : gold}</span>
+                                        <GoldBadge amount={Number.isNaN(gold) ? 0 : gold} />
                                     </div>
                                     
                                     <div className="flex items-center gap-3 h-10">
@@ -660,14 +668,15 @@
                             </div>
                         )}
 
-                        {/* Persistent Header Tabs + Toggle */}
+                        {/* Persistent Header Secondary Bar + Toggle */}
                         <div className={`flex justify-between items-stretch bg-black/10 ${!isNavVisible ? 'pt-safe' : ''}`}>
                             
                             {!isNavVisible && (
                                 <button 
                                     onClick={() => { sound.playBlip(); setShowStatsModal(true); }} 
-                                    className="pl-3 pr-1 py-1 active:scale-95 flex items-center justify-center border-r-2"
+                                    className="pl-3 pr-2 py-1 active:scale-95 flex items-center justify-center border-r-2"
                                     style={{ borderColor: activeTheme.border }}
+                                    title="View Profile"
                                 >
                                     <div className="scale-75"><HeroAvatar /></div>
                                 </button>
@@ -687,7 +696,7 @@
                                             {b.id !== 'all' && activeBoardId === b.id && (
                                                 <button 
                                                     onClick={() => { sound.playBlip(); setDeleteConfirm({ show: true, type: 'board', id: b.id, name: b.name }); }}
-                                                    className="ml-1 p-2 text-red-500 hover:bg-red-500/20 rounded active:scale-90"
+                                                    className="ml-1 p-2 text-red-400 hover:bg-red-500/20 rounded active:scale-90"
                                                     title="Delete Board"
                                                 >
                                                     <span className="text-[10px] font-bold">X</span>
@@ -719,7 +728,7 @@
                                             {activeLibCat === cat.id && cat.id !== 'all' && (
                                                 <button 
                                                     onClick={() => { sound.playBlip(); setDeleteConfirm({ show: true, type: 'libCat', id: cat.id, name: cat.name }); }}
-                                                    className="ml-1 p-2 text-red-500 hover:bg-red-500/20 active:scale-90 rounded"
+                                                    className="ml-1 p-2 text-red-400 hover:bg-red-500/20 active:scale-90 rounded"
                                                     title="Delete List"
                                                 >
                                                     <span className="text-[10px] font-bold">X</span>
@@ -871,16 +880,24 @@
                                         {filteredLibItems.map(item => {
                                             const cat = libraryCategories.find(c => c.id === item.categoryId);
                                             return (
-                                                <div key={item.id} className="pixel-box-sm p-3 bg-white/70 text-black flex justify-between items-center group">
-                                                    <div>
-                                                        <div className="text-sm leading-tight">{item.text}</div>
-                                                        {activeLibCat === 'all' && cat && (
-                                                            <div className="text-[8px] opacity-60 mt-1">{cat.emoji} {cat.name}</div>
-                                                        )}
+                                                <div key={item.id} className={`pixel-box-sm p-3 text-black flex justify-between items-center group transition-colors ${item.done ? 'bg-black/10 opacity-70' : 'bg-white/80'}`}>
+                                                    <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
+                                                        <button 
+                                                            onClick={() => handleToggleLibraryItem(item.id)}
+                                                            className={`w-5 h-5 flex-shrink-0 pixel-box-sm flex items-center justify-center text-xs active:scale-90 ${item.done ? 'bg-green-600 text-white font-bold' : 'bg-white'}`}
+                                                        >
+                                                            {item.done ? '✓' : ''}
+                                                        </button>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className={`text-sm leading-tight break-words ${item.done ? 'line-through opacity-60' : ''}`}>{item.text}</div>
+                                                            {activeLibCat === 'all' && cat && (
+                                                                <div className="text-[8px] opacity-60 mt-1">{cat.emoji} {cat.name}</div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <button 
                                                         onClick={() => handleDeleteLibraryItem(item.id)} 
-                                                        className="text-red-500 font-bold p-2 active:scale-90 text-[12px] opacity-50 hover:opacity-100"
+                                                        className="text-red-500 font-bold p-2 active:scale-90 text-[12px] opacity-50 hover:opacity-100 flex-shrink-0"
                                                     >
                                                         X
                                                     </button>
@@ -911,8 +928,8 @@
                                     <div className="text-center mb-6 p-4 pixel-box bg-white/20" style={{ borderColor: activeTheme.border }}>
                                         <h2 className="text-lg mb-2">THE TAVERN</h2>
                                         <p className="text-[10px] mb-4">SPEND HARD EARNED GOLD!</p>
-                                        <div className="inline-block pixel-box-sm bg-black text-yellow-400 px-4 py-2 text-xl">
-                                            🪙 {Number.isNaN(gold) ? 0 : gold} G
+                                        <div className="inline-block p-2">
+                                            <GoldBadge amount={Number.isNaN(gold) ? 0 : gold} />
                                         </div>
                                     </div>
 
@@ -1001,16 +1018,21 @@
                                     </div>
                                 </div>
                                 
-                                <div className="grid grid-cols-2 gap-4 text-center">
-                                    <div className="pixel-box-sm p-3 bg-black/5 text-black">
-                                        <div className="text-xl text-yellow-600 mb-1">🪙</div>
-                                        <div className="text-sm">{Number.isNaN(gold) ? 0 : gold}</div>
-                                        <div className="text-[8px] opacity-70 mt-1">TOTAL GOLD</div>
+                                <div className="grid grid-cols-3 gap-2 text-center mb-2">
+                                    <div className="pixel-box-sm p-2 bg-black/5 text-black">
+                                        <div className="text-lg text-yellow-600 mb-1">🪙</div>
+                                        <div className="text-xs">{Number.isNaN(gold) ? 0 : gold}</div>
+                                        <div className="text-[7px] opacity-70 mt-1">GOLD</div>
                                     </div>
-                                    <div className="pixel-box-sm p-3 bg-black/5 text-black">
-                                        <div className="text-xl text-blue-500 mb-1">⚔️</div>
-                                        <div className="text-sm">{tasks.filter(t => t.status === 'done').length}</div>
-                                        <div className="text-[8px] opacity-70 mt-1">QUESTS DONE</div>
+                                    <div className="pixel-box-sm p-2 bg-black/5 text-black">
+                                        <div className="text-lg text-blue-500 mb-1">⚔️</div>
+                                        <div className="text-xs">{tasks.filter(t => t.status === 'done').length}</div>
+                                        <div className="text-[7px] opacity-70 mt-1">DONE</div>
+                                    </div>
+                                    <div className="pixel-box-sm p-2 bg-yellow-100 text-black border-yellow-500">
+                                        <div className="text-lg mb-1">📅</div>
+                                        <div className="text-xs font-bold text-yellow-800">{tasks.filter(t => t.dueDate === getTodayStr() && t.status !== 'done').length}</div>
+                                        <div className="text-[7px] opacity-75 mt-1 font-bold">DUE TODAY</div>
                                     </div>
                                 </div>
                             </div>
@@ -1229,7 +1251,7 @@
                 
                 return (
                     <div 
-                        className={`pixel-box p-3 relative group transition-opacity ${isDone ? 'opacity-50' : 'bg-white text-black'}`} 
+                        className={`pixel-box p-3 relative group transition-opacity ${isDone ? 'opacity-70' : 'bg-white text-black'}`} 
                         style={{ backgroundColor: isDone ? activeTheme.tagBg : activeTheme.windowBg, cursor: isDone ? 'default' : 'grab' }}
                         draggable={!isDone}
                         onDragStart={(e) => !isDone && handleDragStart(e, task)}
@@ -1237,23 +1259,23 @@
                         
                         <button 
                             onClick={() => handleDeleteTask(task.id)} 
-                            className="absolute top-2 right-2 text-red-500 font-bold p-1 active:scale-90 text-[10px]"
+                            className="absolute top-2 right-2 text-red-500 font-bold px-1.5 py-0.5 pixel-box-sm bg-white/80 active:scale-90 text-[10px]"
                             title="Delete Task"
                         >
                             X
                         </button>
 
-                        <div className="flex items-start gap-3 pr-4">
+                        <div className="flex items-start gap-3 pr-6">
                             <button 
                                 onClick={() => handleToggleTaskStatus(task)}
                                 disabled={isDone}
-                                className={`w-6 h-6 flex-shrink-0 pixel-box-sm flex items-center justify-center text-xs mt-0.5 ${isDone ? 'bg-black text-white cursor-not-allowed opacity-50' : 'bg-white active:scale-90'}`}
+                                className={`w-6 h-6 flex-shrink-0 pixel-box-sm flex items-center justify-center text-xs mt-0.5 ${isDone ? 'bg-black text-white cursor-not-allowed opacity-60' : 'bg-white active:scale-90'}`}
                             >
                                 {task.status === 'doing' ? 'O' : task.status === 'done' ? 'X' : ''}
                             </button>
                             
                             <div className="flex-1 min-w-0">
-                                <p className={`text-sm mb-2 break-words leading-tight ${isDone ? 'line-through' : ''}`}>
+                                <p className={`text-sm mb-2 break-words leading-tight ${isDone ? 'line-through opacity-70' : ''}`}>
                                     {task.text}
                                 </p>
                                 
