@@ -23,10 +23,6 @@
     <!-- Confetti -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-    <!-- Mobile Drag Drop Polyfill for Touch Screens -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/default.css">
-    <script src="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/index.min.js"></script>
-
     <style>
         body {
             overscroll-behavior-y: none;
@@ -78,7 +74,7 @@
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
 
         class SoundManager {
             constructor() {
@@ -263,33 +259,34 @@
             return d.toISOString().split('T')[0];
         };
 
+        // Seed data — defined once at module scope instead of being rebuilt on every render
+        const initialTasks = [
+            { id: 't1', text: 'Slay the laundry dragon', status: 'todo', boardId: 'house', dueDate: getTodayStr(), subtasks: [{id: 's1', text: 'Wash clothes', done: true}, {id: 's2', text: 'Fold and put away', done: false}] },
+            { id: 't2', text: 'Visit Potion Master (Dentist)', status: 'todo', boardId: 'general', dueDate: getTomorrowStr(), subtasks: [] },
+            { id: 't3', text: 'Cook HP Ration Meals for week', status: 'doing', boardId: 'house', dueDate: getTodayStr(), subtasks: [] },
+            { id: 't4', text: 'Pay the troll toll (Electric bill)', status: 'done', boardId: 'general', dueDate: getTodayStr(), completedAt: getTodayStr(), subtasks: [] }
+        ];
+
+        const initialBoards = [
+            { id: 'all', name: 'ALL QUESTS' },
+            { id: 'house', name: 'HOUSEKEEPING' },
+            { id: 'fitness', name: 'TRAINING' }
+        ];
+
+        const initialLibraryCategories = [
+            { id: 'all', name: 'ALL', emoji: '📚' },
+            { id: 'games', name: 'GAMES TO PLAY', emoji: '🎮' },
+            { id: 'books', name: 'BOOKS TO READ', emoji: '📖' }
+        ];
+
+        const initialLibraryItems = [
+            { id: 'l1', text: 'Stardew Valley 1.6 Update', categoryId: 'games', done: false },
+            { id: 'l2', text: 'Dune Messiah', categoryId: 'books', done: false }
+        ];
+
         function App() {
             const [isDataLoaded, setIsDataLoaded] = useState(false);
             
-            const initialTasks = [
-                { id: 't1', text: 'Slay the laundry dragon', status: 'todo', boardId: 'house', dueDate: getTodayStr(), subtasks: [{id: 's1', text: 'Wash clothes', done: true}, {id: 's2', text: 'Fold and put away', done: false}] },
-                { id: 't2', text: 'Visit Potion Master (Dentist)', status: 'todo', boardId: 'general', dueDate: getTomorrowStr(), subtasks: [] },
-                { id: 't3', text: 'Cook HP Ration Meals for week', status: 'doing', boardId: 'house', dueDate: getTodayStr(), subtasks: [] },
-                { id: 't4', text: 'Pay the troll toll (Electric bill)', status: 'done', boardId: 'general', dueDate: getTodayStr(), completedAt: getTodayStr(), subtasks: [] }
-            ];
-
-            const initialBoards = [
-                { id: 'all', name: 'ALL QUESTS' },
-                { id: 'house', name: 'HOUSEKEEPING' },
-                { id: 'fitness', name: 'TRAINING' }
-            ];
-
-            const initialLibraryCategories = [
-                { id: 'all', name: 'ALL', emoji: '📚' },
-                { id: 'games', name: 'GAMES TO PLAY', emoji: '🎮' },
-                { id: 'books', name: 'BOOKS TO READ', emoji: '📖' }
-            ];
-
-            const initialLibraryItems = [
-                { id: 'l1', text: 'Stardew Valley 1.6 Update', categoryId: 'games', done: false },
-                { id: 'l2', text: 'Dune Messiah', categoryId: 'books', done: false }
-            ];
-
             const [tasks, setTasks] = useState([]);
             const [boards, setBoards] = useState([]);
             const [activeBoardId, setActiveBoardId] = useState('all');
@@ -321,20 +318,15 @@
             // Delete Dialog State
             const [deleteConfirm, setDeleteConfirm] = useState({ show: false, type: '', id: '', name: '' });
 
+            // Custom pointer-based drag state (replaces native HTML5 DnD, which is unreliable on touch)
+            const [dragState, setDragState] = useState(null); // { taskId, x, y, offsetX, offsetY, width, hoverColId }
+            const dragCandidateRef = useRef(null); // pending drag before the hold threshold clears
+            const dragTimerRef = useRef(null);
+
             // Level calculation
             useEffect(() => {
                 setLevel(Math.floor(xp / 100) + 1);
             }, [xp]);
-
-            // Mobile Drag Polyfill Setup (Snappier 255ms hold)
-            useEffect(() => {
-                if (window.MobileDragDrop) {
-                    window.MobileDragDrop.polyfill({
-                        holdToDrag: 255 
-                    });
-                    window.addEventListener('touchmove', function() {}, {passive: false});
-                }
-            }, []);
 
             // Data Loading
             useEffect(() => {
@@ -474,28 +466,11 @@
                 setTasks(tasks.map(t => t.id === id ? { ...t, dueDate: getTomorrowStr() } : t));
             };
 
-            const handleDragStart = (e, task) => {
-                e.dataTransfer.setData('taskId', task.id);
-                e.dataTransfer.effectAllowed = 'move';
-            };
+            const moveTaskToStatus = (task, nextStatus) => {
+                if (!task || task.status === nextStatus || task.status === 'done') return;
 
-            const handleDragOver = (e) => {
-                e.preventDefault(); 
-                e.dataTransfer.dropEffect = 'move';
-            };
-
-            const handleDrop = (e, targetColId) => {
-                e.preventDefault();
-                const taskId = e.dataTransfer.getData('taskId');
-                if (!taskId) return;
-
-                const task = tasks.find(t => t.id === taskId);
-                if (!task || task.status === targetColId || task.status === 'done') return;
-
-                let nextStatus = targetColId;
-                
                 setTasks(prevTasks => prevTasks.map(t => {
-                    if (t.id === taskId) {
+                    if (t.id === task.id) {
                         return { ...t, status: nextStatus, completedAt: nextStatus === 'done' ? getTodayStr() : t.completedAt };
                     }
                     return t;
@@ -510,10 +485,80 @@
                     sound.playBlip(300);
                 }
 
-                if (focusTaskId === taskId && nextStatus === 'done') {
+                if (focusTaskId === task.id && nextStatus === 'done') {
                     setFocusTaskId(null);
                 }
             };
+
+            // Hold-to-drag: works the same for mouse and touch via the Pointer Events API.
+            // A short hold-and-still window disambiguates "starting a drag" from "scrolling the column".
+            const handleCardPointerDown = (e, task) => {
+                if (task.status === 'done') return;
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+                const rect = e.currentTarget.getBoundingClientRect();
+                const candidate = {
+                    taskId: task.id,
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    offsetX: e.clientX - rect.left,
+                    offsetY: e.clientY - rect.top,
+                    width: rect.width,
+                    sourceStatus: task.status
+                };
+                dragCandidateRef.current = candidate;
+
+                clearTimeout(dragTimerRef.current);
+                dragTimerRef.current = setTimeout(() => {
+                    if (dragCandidateRef.current !== candidate) return;
+                    setDragState({ ...candidate, x: candidate.startX, y: candidate.startY, hoverColId: candidate.sourceStatus });
+                    if (navigator.vibrate) navigator.vibrate(10);
+                }, 260);
+            };
+
+            // Window-level listeners drive the drag once it's live (or cancel the candidate on early scroll movement)
+            useEffect(() => {
+                const handleMove = (e) => {
+                    const candidate = dragCandidateRef.current;
+                    if (!candidate) return;
+
+                    if (!dragState) {
+                        const dx = Math.abs(e.clientX - candidate.startX);
+                        const dy = Math.abs(e.clientY - candidate.startY);
+                        if (dx > 8 || dy > 8) {
+                            clearTimeout(dragTimerRef.current);
+                            dragCandidateRef.current = null;
+                        }
+                        return;
+                    }
+
+                    e.preventDefault();
+                    const el = document.elementFromPoint(e.clientX, e.clientY);
+                    const colEl = el && el.closest('[data-colid]');
+                    setDragState(prev => prev ? { ...prev, x: e.clientX, y: e.clientY, hoverColId: colEl ? colEl.dataset.colid : prev.hoverColId } : prev);
+                };
+
+                const handleUp = () => {
+                    clearTimeout(dragTimerRef.current);
+                    setDragState(prev => {
+                        if (prev) {
+                            const task = tasks.find(t => t.id === prev.taskId);
+                            if (task && prev.hoverColId) moveTaskToStatus(task, prev.hoverColId);
+                        }
+                        return null;
+                    });
+                    dragCandidateRef.current = null;
+                };
+
+                window.addEventListener('pointermove', handleMove, { passive: false });
+                window.addEventListener('pointerup', handleUp);
+                window.addEventListener('pointercancel', handleUp);
+                return () => {
+                    window.removeEventListener('pointermove', handleMove);
+                    window.removeEventListener('pointerup', handleUp);
+                    window.removeEventListener('pointercancel', handleUp);
+                };
+            }, [dragState, tasks]);
 
             const handleBuyReward = (cost) => {
                 if (gold >= cost) {
@@ -770,13 +815,14 @@
                                         : colId === 'doing' ? 'IN BATTLE' : 'VICTORY';
                                     const colColor = activeTheme[`col${colId.charAt(0).toUpperCase() + colId.slice(1)}`];
 
+                                    const isDropTarget = dragState && dragState.hoverColId === colId && dragState.sourceStatus !== colId;
+
                                     return (
                                         <div 
                                             key={colId} 
-                                            className="w-[88vw] max-w-[360px] h-full flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden !rounded-t-[4px] !rounded-b-[40px]" 
+                                            data-colid={colId}
+                                            className={`w-[88vw] max-w-[360px] h-full flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden !rounded-t-[4px] !rounded-b-[40px] transition-transform ${isDropTarget ? 'scale-[1.02] ring-4 ring-yellow-300' : ''}`} 
                                             style={{ backgroundColor: colColor }}
-                                            onDragOver={handleDragOver}
-                                            onDrop={(e) => handleDrop(e, colId)}
                                         >
                                             <div className="p-3 border-b-4 border-black/50 bg-black/20 flex items-center justify-between text-white text-xs sticky top-0 z-10 backdrop-blur-sm">
                                                 <span className="truncate pr-2">{colLabel} <span className="opacity-50 text-[10px]">({colTasks.length})</span></span>
@@ -1238,19 +1284,41 @@
                             </div>
                         </div>
                     )}
+
+                    {/* --- DRAG GHOST (follows pointer while a quest is being dragged) --- */}
+                    {dragState && (() => {
+                        const draggedTask = tasks.find(t => t.id === dragState.taskId);
+                        if (!draggedTask) return null;
+                        return (
+                            <div
+                                className="fixed z-[200] pixel-box p-3 pointer-events-none"
+                                style={{
+                                    left: dragState.x - dragState.offsetX,
+                                    top: dragState.y - dragState.offsetY,
+                                    width: dragState.width,
+                                    backgroundColor: activeTheme.windowBg,
+                                    color: activeTheme.border,
+                                    transform: 'rotate(-2deg) scale(1.03)',
+                                    opacity: 0.95
+                                }}
+                            >
+                                <p className="text-sm break-words leading-tight">{draggedTask.text}</p>
+                            </div>
+                        );
+                    })()}
                 </div>
             );
 
             function TaskCard({ task, compact = false }) {
                 const isOverdue = task.dueDate && task.dueDate < getTodayStr() && task.status !== 'done';
                 const isDone = task.status === 'done';
+                const isBeingDragged = dragState && dragState.taskId === task.id;
                 
                 return (
                     <div 
-                        className={`pixel-box p-3 relative group transition-opacity ${isDone ? 'opacity-70' : 'bg-white text-black'}`} 
+                        className={`pixel-box p-3 relative group transition-opacity ${isDone ? 'opacity-70' : 'bg-white text-black'} ${isBeingDragged ? 'opacity-30' : ''}`} 
                         style={{ backgroundColor: isDone ? activeTheme.tagBg : activeTheme.windowBg, cursor: isDone ? 'default' : 'grab' }}
-                        draggable={!isDone}
-                        onDragStart={(e) => !isDone && handleDragStart(e, task)}
+                        onPointerDown={(e) => !isDone && handleCardPointerDown(e, task)}
                     >
                         
                         <button 
