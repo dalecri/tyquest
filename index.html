@@ -303,8 +303,16 @@
             } catch (e) { /* ignore */ }
         };
 
+        // All sync calls go through this so a slow/dead connection times out fast instead of hanging —
+        // the app already has your data locally (IndexedDB), sync is a background bonus, never a blocker.
+        const fetchWithTimeout = (url, options = {}, timeoutMs = 6000) => {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+        };
+
         const jsonbinFetch = async (config) => {
-            const res = await fetch(`${JSONBIN_BASE}/${config.binId}/latest`, {
+            const res = await fetchWithTimeout(`${JSONBIN_BASE}/${config.binId}/latest`, {
                 headers: { 'X-Master-Key': config.apiKey }
             });
             if (!res.ok) throw new Error('Fetch failed: ' + res.status);
@@ -313,7 +321,7 @@
         };
 
         const jsonbinPush = async (config, snapshot) => {
-            const res = await fetch(`${JSONBIN_BASE}/${config.binId}`, {
+            const res = await fetchWithTimeout(`${JSONBIN_BASE}/${config.binId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'X-Master-Key': config.apiKey },
                 body: JSON.stringify(snapshot)
@@ -322,7 +330,7 @@
         };
 
         const jsonbinCreate = async (apiKey, snapshot) => {
-            const res = await fetch(JSONBIN_BASE, {
+            const res = await fetchWithTimeout(JSONBIN_BASE, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Master-Key': apiKey, 'X-Bin-Name': 'TyQuest Sync' },
                 body: JSON.stringify(snapshot)
@@ -398,7 +406,6 @@
 
             // Cross-device sync (JSONBin.io) state
             const [syncConfig, setSyncConfig] = useState(null); // { apiKey, binId }
-            const [showSyncModal, setShowSyncModal] = useState(false);
             const [syncStatus, setSyncStatus] = useState('offline'); // offline | syncing | synced | error
             const [syncFormKey, setSyncFormKey] = useState('');
             const [syncFormBinId, setSyncFormBinId] = useState('');
@@ -563,18 +570,24 @@
             const activeTheme = RETRO_THEMES[themeKey] || RETRO_THEMES.snes16bit;
 
             const triggerConfetti = () => {
-                if (window.confetti) {
+                if (!window.confetti) return;
+                const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#95E06C', '#A78BFA', '#FF9F1C', '#5DA9E9', '#F472B6', activeTheme.primary];
+                const bursts = 7;
+                // Fire several small bursts spread across the top edge, each falling straight down —
+                // reads as pixel confetti raining across the screen instead of exploding from one point.
+                for (let i = 0; i < bursts; i++) {
                     window.confetti({
-                        particleCount: 16,
-                        spread: 45,
-                        startVelocity: 22,
-                        gravity: 1.3,
-                        ticks: 70,
-                        decay: 0.92,
-                        origin: { y: 0.15 },
-                        colors: [activeTheme.primary, '#FFD700', '#ffffff'],
+                        particleCount: 9,
+                        angle: 270,
+                        spread: 60,
+                        startVelocity: 9,
+                        gravity: 0.55,
+                        drift: (Math.random() - 0.5) * 2,
+                        ticks: 220,
+                        origin: { x: (i + 0.5) / bursts, y: -0.05 },
+                        colors,
                         shapes: ['square'],
-                        scalar: 0.7,
+                        scalar: 0.85,
                         disableForReducedMotion: true
                     });
                 }
@@ -897,7 +910,7 @@
                                         <button onClick={() => { sound.playBlip(); setActiveTab('shop'); }} className={`p-1 active:scale-95 transition-colors`} style={{ color: activeTheme.hudText }}>
                                             <IconShop active={activeTab === 'shop'} />
                                         </button>
-                                        <button onClick={() => { sound.playBlip(); setShowSyncModal(true); }} className="p-1 active:scale-95 leading-none" title="Cross-device sync">
+                                        <button onClick={() => { sound.playBlip(); setShowStatsModal(true); }} className="p-1 active:scale-95 leading-none" title="Cross-device sync">
                                             <span className="text-lg">
                                                 {!syncConfig ? '🔌' : syncStatus === 'syncing' ? '🔄' : syncStatus === 'error' ? '⚠️' : '☁️'}
                                             </span>
@@ -1236,7 +1249,7 @@
 
                     {showStatsModal && (
                         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                            <div className="w-full max-w-xs pixel-box bg-white p-6 animate-pop relative" style={{ backgroundColor: activeTheme.windowBg }}>
+                            <div className="w-full max-w-xs pixel-box bg-white p-6 animate-pop relative max-h-[90vh] overflow-y-auto hide-scrollbar" style={{ backgroundColor: activeTheme.windowBg }}>
                                 <button 
                                     onClick={() => { sound.playBlip(); setShowStatsModal(false); }}
                                     className="absolute top-2 right-3 text-red-500 font-bold p-2 active:scale-90 text-sm"
@@ -1259,7 +1272,7 @@
                                     </div>
                                 </div>
                                 
-                                <div className="grid grid-cols-3 gap-2 text-center mb-2">
+                                <div className="grid grid-cols-3 gap-2 text-center mb-6">
                                     <div className="pixel-box-sm p-2 bg-black/5 text-black">
                                         <div className="text-lg mb-1"><GoldBadge amount="" /></div>
                                         <div className="text-xs">{Number.isNaN(gold) ? 0 : gold}</div>
@@ -1275,6 +1288,73 @@
                                         <div className="text-xs font-bold text-yellow-800">{tasks.filter(t => t.dueDate === getTodayStr() && t.status !== 'done').length}</div>
                                         <div className="text-[7px] opacity-75 mt-1 font-bold">DUE TODAY</div>
                                     </div>
+                                </div>
+
+                                {/* --- API CONNECTION (cross-device sync) --- */}
+                                <div className="pt-4 border-t-2 border-black/10 text-black">
+                                    <h3 className="text-[10px] mb-3 uppercase tracking-widest opacity-70 flex items-center gap-1">
+                                        <span>
+                                            {!syncConfig ? '🔌' : syncStatus === 'syncing' ? '🔄' : syncStatus === 'error' ? '⚠️' : '☁️'}
+                                        </span>
+                                        API Connection
+                                    </h3>
+
+                                    {syncConfig ? (
+                                        <div>
+                                            {justCreatedBinId === syncConfig.binId && (
+                                                <div className="mb-3 p-3 pixel-box-sm bg-yellow-100 text-center">
+                                                    <p className="text-[8px] mb-1">🎉 NEW SYNC CREATED — SAVE THIS BIN ID FOR THE OTHER DEVICE:</p>
+                                                    <p className="text-sm font-bold break-all">{syncConfig.binId}</p>
+                                                </div>
+                                            )}
+                                            <p className="text-[8px] mb-2 opacity-60">BIN ID</p>
+                                            <input readOnly value={syncConfig.binId} onFocus={(e) => e.target.select()} className="w-full pixel-box-sm p-2 text-[10px] bg-white text-black mb-3" />
+                                            <p className="text-[8px] mb-3 opacity-60">
+                                                Status: {syncStatus === 'syncing' ? 'Syncing…' : syncStatus === 'error' ? 'Connection error — will retry next sync' : 'Synced'}
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <button type="button" onClick={() => { sound.playBlip(); pullNow(); }} className="flex-1 pixel-box-sm py-2 text-[10px] bg-blue-500 text-white active:scale-95">SYNC NOW</button>
+                                                <button type="button" onClick={() => { sound.playError(); disconnectSync(); }} className="flex-1 pixel-box-sm py-2 text-[10px] bg-red-500 text-white active:scale-95">DISCONNECT</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <p className="text-[8px] mb-3 opacity-70 leading-relaxed">Free JSONBin.io account — no email sign-in here, just an API key from jsonbin.io.</p>
+
+                                            <input
+                                                type="text" value={syncFormKey} onChange={(e) => setSyncFormKey(e.target.value)}
+                                                placeholder="JSONBIN API KEY"
+                                                className="w-full pixel-box-sm p-2 text-[10px] mb-2 bg-white text-black focus:outline-none"
+                                            />
+
+                                            <button
+                                                type="button"
+                                                onClick={() => syncFormKey && createNewBin(syncFormKey)}
+                                                disabled={!syncFormKey || syncStatus === 'syncing'}
+                                                className={`w-full pixel-box-sm py-2 text-[10px] bg-green-500 text-white active:scale-95 mb-3 ${(!syncFormKey || syncStatus === 'syncing') ? 'opacity-50' : ''}`}
+                                            >
+                                                CREATE NEW SYNC
+                                            </button>
+
+                                            <div className="text-center text-[7px] opacity-50 mb-3">— OR, if the other device already made one —</div>
+
+                                            <input
+                                                type="text" value={syncFormBinId} onChange={(e) => setSyncFormBinId(e.target.value)}
+                                                placeholder="PASTE BIN ID HERE"
+                                                className="w-full pixel-box-sm p-2 text-[10px] mb-2 bg-white text-black focus:outline-none"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => syncFormKey && syncFormBinId && connectToBin(syncFormKey, syncFormBinId)}
+                                                disabled={!syncFormKey || !syncFormBinId || syncStatus === 'syncing'}
+                                                className={`w-full pixel-box-sm py-2 text-[10px] bg-blue-500 text-white active:scale-95 ${(!syncFormKey || !syncFormBinId || syncStatus === 'syncing') ? 'opacity-50' : ''}`}
+                                            >
+                                                CONNECT TO EXISTING
+                                            </button>
+
+                                            {syncError && <p className="text-[9px] text-red-500 mt-2">{syncError}</p>}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1453,78 +1533,6 @@
                                         <button type="submit" className="flex-1 pixel-box-sm py-3 text-xs bg-blue-500 text-white active:scale-95">CREATE</button>
                                     </div>
                                 </form>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* --- SYNC MODAL --- */}
-                    {showSyncModal && (
-                        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                            <div className="w-full max-w-md pixel-box bg-white p-6 animate-pop max-h-[90vh] overflow-y-auto hide-scrollbar text-black" style={{ backgroundColor: activeTheme.windowBg }}>
-                                <h2 className="text-sm mb-4">☁️ CROSS-DEVICE SYNC</h2>
-
-                                {syncConfig ? (
-                                    <div>
-                                        {justCreatedBinId === syncConfig.binId && (
-                                            <div className="mb-4 p-3 pixel-box-sm bg-yellow-100 text-center">
-                                                <p className="text-[8px] mb-1">🎉 NEW SYNC CREATED — SAVE THIS BIN ID FOR THE OTHER DEVICE:</p>
-                                                <p className="text-sm font-bold break-all">{syncConfig.binId}</p>
-                                            </div>
-                                        )}
-                                        <p className="text-[10px] mb-3 opacity-70">Enter this same API Key + Bin ID on the other device to see the same quests there.</p>
-                                        <div className="mb-3">
-                                            <p className="text-[8px] mb-1 opacity-60">BIN ID</p>
-                                            <input readOnly value={syncConfig.binId} onFocus={(e) => e.target.select()} className="w-full pixel-box-sm p-2 text-[10px] bg-white text-black" />
-                                        </div>
-                                        <p className="text-[8px] mb-4 opacity-60">
-                                            Status: {syncStatus === 'syncing' ? 'Syncing…' : syncStatus === 'error' ? 'Connection error — will retry next sync' : 'Synced'}
-                                        </p>
-                                        <div className="flex gap-3">
-                                            <button type="button" onClick={() => { sound.playBlip(); pullNow(); }} className="flex-1 pixel-box-sm py-3 text-xs bg-blue-500 text-white active:scale-95">SYNC NOW</button>
-                                            <button type="button" onClick={() => { sound.playError(); disconnectSync(); }} className="flex-1 pixel-box-sm py-3 text-xs bg-red-500 text-white active:scale-95">DISCONNECT</button>
-                                        </div>
-                                        <button type="button" onClick={() => { sound.playBlip(); setShowSyncModal(false); }} className="w-full mt-3 pixel-box-sm py-2 text-[10px] bg-gray-300 text-black active:scale-95">CLOSE</button>
-                                    </div>
-                                ) : (
-                                    <div>
-                                        <p className="text-[10px] mb-4 opacity-70">Uses a free JSONBin.io account — no email sign-in on this end, just an API key. Grab a free key at jsonbin.io, paste it below.</p>
-
-                                        <input
-                                            type="text" value={syncFormKey} onChange={(e) => setSyncFormKey(e.target.value)}
-                                            placeholder="JSONBIN API KEY"
-                                            className="w-full pixel-box-sm p-3 text-[10px] mb-3 bg-white text-black focus:outline-none"
-                                        />
-
-                                        <button
-                                            type="button"
-                                            onClick={() => syncFormKey && createNewBin(syncFormKey)}
-                                            disabled={!syncFormKey || syncStatus === 'syncing'}
-                                            className={`w-full pixel-box-sm py-3 text-xs bg-green-500 text-white active:scale-95 mb-4 ${(!syncFormKey || syncStatus === 'syncing') ? 'opacity-50' : ''}`}
-                                        >
-                                            CREATE NEW SYNC (first device)
-                                        </button>
-
-                                        <div className="text-center text-[8px] opacity-50 mb-4">— OR, if the other device already made one —</div>
-
-                                        <input
-                                            type="text" value={syncFormBinId} onChange={(e) => setSyncFormBinId(e.target.value)}
-                                            placeholder="PASTE BIN ID HERE"
-                                            className="w-full pixel-box-sm p-3 text-[10px] mb-3 bg-white text-black focus:outline-none"
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => syncFormKey && syncFormBinId && connectToBin(syncFormKey, syncFormBinId)}
-                                            disabled={!syncFormKey || !syncFormBinId || syncStatus === 'syncing'}
-                                            className={`w-full pixel-box-sm py-3 text-xs bg-blue-500 text-white active:scale-95 ${(!syncFormKey || !syncFormBinId || syncStatus === 'syncing') ? 'opacity-50' : ''}`}
-                                        >
-                                            CONNECT TO EXISTING
-                                        </button>
-
-                                        {syncError && <p className="text-[10px] text-red-500 mt-3">{syncError}</p>}
-
-                                        <button type="button" onClick={() => { sound.playBlip(); setShowSyncModal(false); }} className="w-full mt-4 pixel-box-sm py-2 text-[10px] bg-gray-300 text-black active:scale-95">CLOSE</button>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     )}
