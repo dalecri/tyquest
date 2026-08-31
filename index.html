@@ -11,7 +11,7 @@
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&family=VT323&family=JetBrains+Mono:wght@400;700&family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
     
     <!-- React & ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
@@ -19,9 +19,6 @@
     
     <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
 
     <style>
         body {
@@ -44,8 +41,8 @@
             border-radius: 2px;
         }
 
-        .font-arcade { font-family: var(--pixel-font, 'Silkscreen'), cursive; }
-        .font-sans { font-family: 'JetBrains Mono', monospace; }
+        .font-arcade { font-family: 'Silkscreen', cursive; }
+        .font-sans { font-family: 'Silkscreen', cursive; } /* Unified to Silkscreen */
 
         @keyframes float {
             0% { transform: translateY(0px); }
@@ -63,15 +60,21 @@
 
         .pb-safe { padding-bottom: env(safe-area-inset-bottom, 24px); }
         .pt-safe { padding-top: env(safe-area-inset-top, 12px); }
+        
+        /* Clean Date Input Fix */
+        input[type="date"] {
+            box-sizing: border-box;
+            appearance: none;
+            -webkit-appearance: none;
+        }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        const { useState, useEffect, useMemo, useRef } = React;
+        const { useState, useEffect, useMemo } = React;
 
-        // --- AUDIO ENGINE ---
         class SoundManager {
             constructor() {
                 this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -103,7 +106,6 @@
         }
         const sound = new SoundManager();
 
-        // --- CONSTANTS & THEMES ---
         const RETRO_THEMES = {
             snes16bit: {
                 id: 'snes16bit', name: '16-Bit Town', isDark: false, cost: 0,
@@ -126,26 +128,81 @@
                 border: '#332620', primary: '#8c6b5d', colTodo: '#c49a7c', colDoing: '#a87b5d', colDone: '#825b42', tagBg: '#e3d2c1'
             }
         };
-        
-        const APP_FONTS = {
-            silkscreen: "'Silkscreen', cursive",
-            vt323: "'VT323', monospace",
-            jetbrains: "'JetBrains Mono', monospace",
-            plex: "'IBM Plex Mono', monospace"
-        };
 
         const SHOP_REWARDS = [
-            { id: 'r1', name: 'Buy a Coffee Treat', cost: 25, icon: '☕' },
-            { id: 'r2', name: '20 Min Guilt-Free Doomscroll', cost: 50, icon: '📱' },
-            { id: 'r3', name: 'Get Out of a Chore Free', cost: 150, icon: '🃏' },
-            { id: 'r4', name: "Husband's Back Massage Pass", cost: 200, icon: '💆‍♂️' },
-            { id: 'r5', name: '1 Hour Guilt-Free Gaming', cost: 75, icon: '🎮' },
-            { id: 'r6', name: 'Pajama Day (Weekend)', cost: 300, icon: '🛏️' },
-            { id: 'r7', name: 'Buy Hobby Supplies ($20 Limit)', cost: 500, icon: '🎨' },
-            { id: 'r8', name: 'Takeout Dinner of Choice', cost: 400, icon: '🍕' }
+            { id: 'r1', name: 'Buy a Coffee Treat', cost: 25 },
+            { id: 'r2', name: '20 Min Guilt-Free Doomscroll', cost: 50 },
+            { id: 'r3', name: 'Get Out of a Chore Free', cost: 150 },
+            { id: 'r4', name: "Husband's Back Massage Pass", cost: 200 },
+            { id: 'r5', name: '1 Hour Guilt-Free Gaming', cost: 75 },
+            { id: 'r6', name: 'Pajama Day (Weekend)', cost: 300 },
+            { id: 'r7', name: 'Buy Hobby Supplies ($20 Limit)', cost: 500 },
+            { id: 'r8', name: 'Takeout Dinner of Choice', cost: 400 }
         ];
 
-        // --- INDEXEDDB SETUP ---
+        const HeroAvatar = () => (
+            <svg width="40" height="40" viewBox="0 0 16 16" className="pixel-box bg-[#87CEEB]" style={{ borderColor: 'var(--app-border)' }}>
+                <rect x="5" y="5" width="6" height="6" fill="#FFDFC4"/> {/* Skin */}
+                <rect x="4" y="3" width="8" height="3" fill="#5C3A21"/> {/* Hair */}
+                <rect x="4" y="6" width="2" height="2" fill="#5C3A21"/>
+                <rect x="10" y="6" width="2" height="2" fill="#5C3A21"/>
+                <rect x="6" y="7" width="1" height="1" fill="#000"/> {/* Eye */}
+                <rect x="9" y="7" width="1" height="1" fill="#000"/> {/* Eye */}
+                <rect x="7" y="9" width="2" height="1" fill="#E88A8A"/> {/* Mouth */}
+                <rect x="4" y="11" width="8" height="5" fill="#4ade80"/> {/* Shirt */}
+            </svg>
+        );
+
+        const IconBoard = ({ active }) => (
+            <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor" className={`transition-opacity ${active ? "opacity-100" : "opacity-40"}`}>
+                <rect x="1" y="2" width="4" height="12" />
+                <rect x="6" y="2" width="4" height="8" />
+                <rect x="11" y="2" width="4" height="10" />
+            </svg>
+        );
+
+        const IconList = ({ active }) => (
+            <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor" className={`transition-opacity ${active ? "opacity-100" : "opacity-40"}`}>
+                <rect x="2" y="3" width="3" height="3" />
+                <rect x="6" y="3" width="8" height="3" />
+                <rect x="2" y="8" width="3" height="3" />
+                <rect x="6" y="8" width="8" height="3" />
+            </svg>
+        );
+
+        const IconShop = ({ active }) => (
+            <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor" className={`transition-opacity ${active ? "opacity-100" : "opacity-40"}`}>
+                <rect x="3" y="2" width="10" height="3" />
+                <rect x="2" y="5" width="12" height="9" />
+                <rect x="6" y="9" width="4" height="5" fill="var(--app-hudBg, #000)" opacity="0.6" />
+            </svg>
+        );
+
+        const IconBoss = () => (
+            <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor" className="text-red-500 animate-pulse">
+                <rect x="4" y="2" width="8" height="8" />
+                <rect x="5" y="10" width="6" height="4" />
+                <rect x="5" y="5" width="2" height="2" fill="var(--app-hudBg, #000)"/>
+                <rect x="9" y="5" width="2" height="2" fill="var(--app-hudBg, #000)"/>
+                <rect x="7" y="8" width="2" height="1" fill="var(--app-hudBg, #000)"/>
+                <rect x="5" y="11" width="1" height="3" fill="var(--app-hudBg, #000)"/>
+                <rect x="7" y="11" width="2" height="3" fill="var(--app-hudBg, #000)"/>
+                <rect x="10" y="11" width="1" height="3" fill="var(--app-hudBg, #000)"/>
+            </svg>
+        );
+
+        const IconChevronUp = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="square">
+                <polyline points="18 15 12 9 6 15"></polyline>
+            </svg>
+        );
+
+        const IconChevronDown = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="square">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+        );
+
         const DB_NAME = 'TyQuestDB';
         const STORE_NAME = 'appData';
 
@@ -183,7 +240,6 @@
             } catch (e) { return null; }
         };
 
-        // --- UTILS ---
         const getTodayStr = () => new Date().toISOString().split('T')[0];
         const getTomorrowStr = () => {
             const d = new Date();
@@ -191,7 +247,6 @@
             return d.toISOString().split('T')[0];
         };
 
-        // --- MAIN APP COMPONENT ---
         function App() {
             const [isDataLoaded, setIsDataLoaded] = useState(false);
             
@@ -200,22 +255,19 @@
                 { id: 't1', text: 'Slay the laundry dragon', status: 'todo', boardId: 'house', dueDate: getTodayStr(), subtasks: [{id: 's1', text: 'Wash clothes', done: true}, {id: 's2', text: 'Fold and put away', done: false}] },
                 { id: 't2', text: 'Visit Potion Master (Dentist)', status: 'todo', boardId: 'general', dueDate: getTomorrowStr(), subtasks: [] },
                 { id: 't3', text: 'Cook HP Ration Meals for week', status: 'doing', boardId: 'house', dueDate: getTodayStr(), subtasks: [] },
-                { id: 't4', text: 'Pay the troll toll (Electric bill)', status: 'done', boardId: 'general', dueDate: getTodayStr(), subtasks: [] },
-                { id: 't5', text: 'Take out the recycling', status: 'done', boardId: 'house', dueDate: getTodayStr(), subtasks: [] },
-                { id: 't6', text: 'File tax scrolls', status: 'todo', boardId: 'general', dueDate: '2026-08-01', subtasks: [] }, // Overdue
-                { id: 't7', text: 'Buy new running shoes', status: 'todo', boardId: 'fitness', dueDate: getTomorrowStr(), subtasks: [] }
+                { id: 't4', text: 'Pay the troll toll (Electric bill)', status: 'done', boardId: 'general', dueDate: getTodayStr(), subtasks: [] }
             ];
 
             const initialBoards = [
-                { id: 'all', name: 'ALL QUESTS', icon: '⚔️' },
-                { id: 'house', name: 'HOUSEKEEPING', icon: '🧹' },
-                { id: 'fitness', name: 'TRAINING', icon: '🏋️' }
+                { id: 'all', name: 'ALL QUESTS' },
+                { id: 'house', name: 'HOUSEKEEPING' },
+                { id: 'fitness', name: 'TRAINING' }
             ];
 
             const [tasks, setTasks] = useState([]);
             const [boards, setBoards] = useState([]);
             const [activeBoardId, setActiveBoardId] = useState('all');
-            const [activeTab, setActiveTab] = useState('board'); // board, list, shop
+            const [activeTab, setActiveTab] = useState('board'); 
             
             const [xp, setXp] = useState(0);
             const [level, setLevel] = useState(1);
@@ -223,10 +275,11 @@
             
             const [themeKey, setThemeKey] = useState('snes16bit');
             const [unlockedThemes, setUnlockedThemes] = useState(['snes16bit']);
-            const [appFont, setAppFont] = useState('silkscreen');
 
-            const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
+            const [isNavVisible, setIsNavVisible] = useState(true);
+            const [showStatsModal, setShowStatsModal] = useState(false);
             const [isAddingQuest, setIsAddingQuest] = useState(false);
+            const [showSubtasksInput, setShowSubtasksInput] = useState(false);
             const [isManagingBoard, setIsManagingBoard] = useState(false);
             const [focusTaskId, setFocusTaskId] = useState(null);
 
@@ -235,22 +288,9 @@
                 setLevel(Math.floor(xp / 100) + 1);
             }, [xp]);
 
-            // Auto Dark Mode
-            useEffect(() => {
-                const checkTime = () => {
-                    const currentHour = new Date().getHours();
-                    if (currentHour >= 20 || currentHour < 6) {
-                        if (themeKey === 'snes16bit' || themeKey === 'sageWordnest') {
-                            if (unlockedThemes.includes('cyberArcade')) {
-                                setThemeKey('cyberArcade');
-                            }
-                        }
-                    }
-                };
-                checkTime();
-            }, [themeKey, unlockedThemes]);
+            // Note: Auto Dark Mode forcibly overriding themes was removed here to fix 
+            // the user being locked out of equipping purchased themes after 8 PM.
 
-            // Data Loading
             useEffect(() => {
                 const loadData = async () => {
                     const savedTasks = await loadFromDB('tq_tasks');
@@ -259,25 +299,21 @@
                     const savedGold = await loadFromDB('tq_gold');
                     const savedTheme = await loadFromDB('tq_theme');
                     const savedUnlockedThemes = await loadFromDB('tq_unlocked_themes');
-                    const savedFont = await loadFromDB('tq_font');
 
                     if (savedTasks && savedTasks.length > 0) { setTasks(savedTasks); } else { setTasks(initialTasks); }
                     if (savedBoards && savedBoards.length > 0) { setBoards(savedBoards); } else { setBoards(initialBoards); }
                     
-                    // Fix NaN checking for loaded numbers
                     if (savedXp !== null && !isNaN(parseInt(savedXp, 10))) { setXp(parseInt(savedXp, 10)); } else { setXp(0); }
                     if (savedGold !== null && !isNaN(parseInt(savedGold, 10))) { setGold(parseInt(savedGold, 10)); } else { setGold(0); }
                     
                     if (savedTheme) setThemeKey(savedTheme);
                     if (savedUnlockedThemes) setUnlockedThemes(savedUnlockedThemes);
-                    if (savedFont) setAppFont(savedFont);
 
                     setIsDataLoaded(true);
                 };
                 loadData();
             }, []);
 
-            // Data Saving
             useEffect(() => {
                 if (!isDataLoaded) return;
                 saveToDB('tq_tasks', tasks);
@@ -286,12 +322,10 @@
                 saveToDB('tq_gold', gold.toString());
                 saveToDB('tq_theme', themeKey);
                 saveToDB('tq_unlocked_themes', unlockedThemes);
-                saveToDB('tq_font', appFont);
-            }, [tasks, boards, xp, gold, themeKey, unlockedThemes, appFont, isDataLoaded]);
+            }, [tasks, boards, xp, gold, themeKey, unlockedThemes, isDataLoaded]);
 
             const activeTheme = RETRO_THEMES[themeKey] || RETRO_THEMES.snes16bit;
 
-            // --- ACTIONS ---
             const handleAddTask = (text, date, boardId, subtasksArr) => {
                 const newTask = {
                     id: Date.now().toString(),
@@ -304,6 +338,7 @@
                 setTasks([newTask, ...tasks]);
                 sound.playBlip(600);
                 setIsAddingQuest(false);
+                setShowSubtasksInput(false);
             };
 
             const handleToggleTaskStatus = (task) => {
@@ -325,6 +360,15 @@
                 if (focusTaskId === task.id && nextStatus === 'done') {
                     setFocusTaskId(null);
                 }
+            };
+
+            const handleDefeatBoss = (taskId) => {
+                // Instantly complete task from any state when attacked in Boss Mode
+                setTasks(tasks.map(t => t.id === taskId ? { ...t, status: 'done' } : t));
+                sound.playCoin();
+                setXp(prev => prev + 50);
+                setGold(prev => prev + 10);
+                setFocusTaskId(null);
             };
 
             const handleToggleSubtask = (taskId, subIdx) => {
@@ -382,17 +426,12 @@
 
             const handleDeleteBoard = (boardId) => {
                 if (boardId === 'all') return;
-                
-                // Move tasks to general
                 setTasks(tasks.map(t => t.boardId === boardId ? { ...t, boardId: 'general' } : t));
-                
-                // Remove board
                 setBoards(boards.filter(b => b.id !== boardId));
                 setActiveBoardId('all');
                 sound.playError();
             };
 
-            // --- RENDER HELPERS ---
             const filteredTasks = useMemo(() => {
                 if (activeBoardId === 'all') return tasks;
                 return tasks.filter(t => t.boardId === activeBoardId);
@@ -405,7 +444,6 @@
                 return active.sort((a, b) => new Date(a.dueDate || '2099-01-01') - new Date(b.dueDate || '2099-01-01'))[0];
             }, [tasks]);
 
-            // --- LOADING STATE ---
             if (!isDataLoaded) {
                 return (
                     <div className="min-h-screen flex items-center justify-center font-arcade text-xl" style={{ backgroundColor: activeTheme.bg, color: activeTheme.border }}>
@@ -414,119 +452,126 @@
                 );
             }
 
-            // --- CSS VARIABLES ---
-            const appStyle = {
-                backgroundColor: activeTheme.bg,
-                color: activeTheme.border,
-                '--app-bg': activeTheme.bg,
-                '--app-border': activeTheme.border,
-                '--pixel-font': APP_FONTS[appFont] || APP_FONTS.silkscreen
-            };
-
             return (
-                <div className="min-h-screen h-screen flex flex-col overflow-hidden relative" style={appStyle}>
+                <div 
+                    className="min-h-screen h-screen flex flex-col overflow-hidden relative font-arcade" 
+                    style={{ 
+                        backgroundColor: activeTheme.bg, 
+                        color: activeTheme.border, 
+                        '--app-bg': activeTheme.bg, 
+                        '--app-border': activeTheme.border,
+                        '--app-hudBg': activeTheme.hudBg
+                    }}
+                >
                     
                     {/* --- HEADER --- */}
-                    <header className="flex-shrink-0 z-20 transition-all duration-300" style={{ backgroundColor: activeTheme.hudBg, color: activeTheme.hudText, borderBottom: `4px solid ${activeTheme.border}` }}>
-                        {/* Expandable Stats Drawer */}
-                        {isHeaderExpanded && (
-                            <div className="px-4 py-3 border-b-4 bg-black/10" style={{ borderColor: activeTheme.border }}>
-                                <div className="flex justify-between items-end mb-2">
+                    <header className="flex-shrink-0 z-20 transition-all duration-300 relative" style={{ backgroundColor: activeTheme.hudBg, color: activeTheme.hudText, borderBottom: `4px solid ${activeTheme.border}` }}>
+                        
+                        {/* Top Bar (Collapsible) */}
+                        {isNavVisible && (
+                            <div className="px-4 py-3 flex justify-between items-center pt-safe border-b-4" style={{ borderColor: activeTheme.border }}>
+                                <div className="flex items-center gap-3">
+                                    <button onClick={() => { sound.playBlip(); setShowStatsModal(true); }} className="active:scale-95 transition-transform flex-shrink-0">
+                                        <HeroAvatar />
+                                    </button>
                                     <div>
-                                        <p className="font-arcade text-[10px] opacity-70">HERO RANK</p>
-                                        <p className="font-arcade text-lg">LVL {level} TYLER</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="font-arcade text-[10px] text-yellow-400">XP TO NEXT LVL</p>
-                                        <p className="font-arcade text-sm">{xp % 100} / 100</p>
+                                        <h1 className="text-sm leading-tight">TYLER</h1>
+                                        <p className="text-[10px] opacity-80">LVL {level}</p>
                                     </div>
                                 </div>
-                                <div className="w-full h-3 pixel-box bg-black/30 p-0.5">
-                                    <div className="h-full bg-green-400 transition-all duration-500" style={{ width: `${Math.max(5, xp % 100)}%` }}></div>
-                                </div>
-                            </div>
-                        )}
 
-                        {/* Main Top Bar */}
-                        <div className="px-4 py-3 flex justify-between items-center pt-safe">
-                            <div className="flex items-center gap-3">
-                                <button onClick={() => { sound.playBlip(); setIsHeaderExpanded(!isHeaderExpanded); }} className="active:scale-95 transition-transform">
-                                    <img src={`https://api.dicebear.com/7.x/pixel-art/svg?seed=Tyler${level}`} alt="Avatar" className="w-10 h-10 pixel-box bg-white" style={{ borderColor: activeTheme.hudText }} />
-                                </button>
-                                <div>
-                                    <h1 className="font-arcade text-sm leading-tight">TYLER</h1>
-                                    <p className="font-arcade text-[10px] opacity-80">LVL {level}</p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <div className="pixel-box-sm bg-black/30 px-2 py-1 flex items-center gap-1 h-10">
-                                    <span className="text-yellow-400 text-sm">🪙</span>
-                                    <span className="font-arcade text-xs text-yellow-400">{Number.isNaN(gold) ? 0 : gold}</span>
-                                </div>
-                                <div className="flex gap-1 h-10">
-                                    {oldestFocusTask && (
-                                        <button onClick={() => { sound.playMagic(); setFocusTaskId(oldestFocusTask.id); }} className="w-10 h-10 pixel-box bg-red-900 border-red-500 flex items-center justify-center text-lg active:scale-95 animate-pulse" title="Focus Boss">
-                                            💀
-                                        </button>
-                                    )}
-                                    <button onClick={() => { sound.playBlip(); setActiveTab('board'); }} className={`w-10 h-10 pixel-box flex items-center justify-center text-lg active:scale-95 ${activeTab === 'board' ? 'bg-white/20' : 'bg-black/20'}`} style={{ borderColor: activeTheme.hudText }}>⚔️</button>
-                                    <button onClick={() => { sound.playBlip(); setActiveTab('list'); }} className={`w-10 h-10 pixel-box flex items-center justify-center text-lg active:scale-95 ${activeTab === 'list' ? 'bg-white/20' : 'bg-black/20'}`} style={{ borderColor: activeTheme.hudText }}>📝</button>
-                                    <button onClick={() => { sound.playBlip(); setActiveTab('shop'); }} className={`w-10 h-10 pixel-box flex items-center justify-center text-lg active:scale-95 ${activeTab === 'shop' ? 'bg-white/20' : 'bg-black/20'}`} style={{ borderColor: activeTheme.hudText }}>🏪</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Board Tabs */}
-                        {(activeTab === 'board' || activeTab === 'list') && (
-                            <div className="flex overflow-x-auto hide-scrollbar px-2 py-2 gap-2 bg-black/20 items-center">
-                                {boards.map(b => (
-                                    <div key={b.id} className="flex items-center">
-                                        <button 
-                                            onClick={() => { sound.playBlip(); setActiveBoardId(b.id); }}
-                                            className={`px-3 py-2 pixel-box-sm font-arcade text-[10px] whitespace-nowrap active:scale-95 flex items-center gap-1 ${activeBoardId === b.id ? 'bg-white text-black' : 'bg-black/40 text-white'}`}
-                                            style={{ borderColor: activeTheme.hudText }}
-                                        >
-                                            <span>{b.icon}</span> {b.name}
-                                        </button>
-                                        {b.id !== 'all' && activeBoardId === b.id && (
-                                            <button 
-                                                onClick={() => handleDeleteBoard(b.id)}
-                                                className="ml-1 p-2 text-red-500 hover:bg-red-500/20 rounded pixel-box-sm border-transparent active:scale-90"
-                                                title="Delete Board"
-                                            >
-                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-1.5 px-2">
+                                        <div className="w-3 h-3 bg-yellow-400 border border-black pixel-box-sm flex-shrink-0"></div>
+                                        <span className="text-xs text-yellow-400">{Number.isNaN(gold) ? 0 : gold}</span>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-3 h-10">
+                                        {oldestFocusTask && (
+                                            <button onClick={() => { sound.playMagic(); setFocusTaskId(oldestFocusTask.id); }} className="p-1 active:scale-95" title="Focus Boss">
+                                                <IconBoss />
                                             </button>
                                         )}
+                                        <button onClick={() => { sound.playBlip(); setActiveTab('board'); }} className={`p-1 active:scale-95 transition-colors`} style={{ color: activeTheme.hudText }}>
+                                            <IconBoard active={activeTab === 'board'} />
+                                        </button>
+                                        <button onClick={() => { sound.playBlip(); setActiveTab('list'); }} className={`p-1 active:scale-95 transition-colors`} style={{ color: activeTheme.hudText }}>
+                                            <IconList active={activeTab === 'list'} />
+                                        </button>
+                                        <button onClick={() => { sound.playBlip(); setActiveTab('shop'); }} className={`p-1 active:scale-95 transition-colors`} style={{ color: activeTheme.hudText }}>
+                                            <IconShop active={activeTab === 'shop'} />
+                                        </button>
                                     </div>
-                                ))}
-                                <button 
-                                    onClick={() => { sound.playBlip(); setIsManagingBoard(true); }}
-                                    className="px-3 py-2 pixel-box-sm font-arcade text-[10px] whitespace-nowrap bg-black/40 text-white active:scale-95"
-                                    style={{ borderColor: activeTheme.hudText }}
-                                >
-                                    + NEW BOARD
-                                </button>
+                                </div>
                             </div>
                         )}
+
+                        {}
+                        {/* Persistent Header Board Tabs + Toggle */}
+                        <div className={`flex justify-between items-stretch bg-black/10 ${!isNavVisible ? 'pt-safe' : ''}`}>
+                            {(activeTab === 'board' || activeTab === 'list') ? (
+                                <div className="flex overflow-x-auto hide-scrollbar px-2 py-2 gap-2 items-center flex-1">
+                                    {boards.map(b => (
+                                        <div key={b.id} className="flex items-center">
+                                            <button 
+                                                onClick={() => { sound.playBlip(); setActiveBoardId(b.id); }}
+                                                className={`px-3 py-2 pixel-box-sm text-[10px] whitespace-nowrap active:scale-95 ${activeBoardId === b.id ? 'bg-white text-black' : 'bg-transparent text-inherit'}`}
+                                                style={{ borderColor: activeTheme.hudText, color: activeBoardId !== b.id ? activeTheme.hudText : 'black' }}
+                                            >
+                                                {b.name}
+                                            </button>
+                                            {b.id !== 'all' && activeBoardId === b.id && (
+                                                <button 
+                                                    onClick={() => handleDeleteBoard(b.id)}
+                                                    className="ml-1 p-2 text-red-500 hover:bg-red-500/20 rounded active:scale-90"
+                                                    title="Delete Board"
+                                                >
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <button 
+                                        onClick={() => { sound.playBlip(); setIsManagingBoard(true); }}
+                                        className="px-3 py-2 pixel-box-sm text-[10px] whitespace-nowrap bg-black/40 text-white active:scale-95 border-dashed"
+                                        style={{ borderColor: activeTheme.hudText }}
+                                    >
+                                        + NEW BOARD
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="flex-1 px-4 py-3 text-xs opacity-70 flex items-center">
+                                    THE TAVERN
+                                </div>
+                            )}
+
+                            {/* Nav Toggle Button */}
+                            <button 
+                                onClick={() => { sound.playBlip(); setIsNavVisible(!isNavVisible); }}
+                                className="px-4 active:scale-95 border-l-4 flex items-center justify-center flex-shrink-0"
+                                style={{ borderColor: activeTheme.border, color: activeTheme.hudText }}
+                            >
+                                {isNavVisible ? <IconChevronUp /> : <IconChevronDown />}
+                            </button>
+                        </div>
                     </header>
 
+                    {}
                     {/* --- MAIN CONTENT AREA --- */}
                     <main className="flex-1 overflow-hidden relative flex flex-col min-h-0 h-full">
                         
-                        {/* TAB: KANBAN BOARD */}
                         {activeTab === 'board' && (
-                            <div className="flex-1 overflow-x-auto snap-x snap-mandatory hide-scrollbar p-4 flex gap-4 items-stretch h-full">
+                            <div className="flex-1 overflow-x-auto snap-x snap-mandatory hide-scrollbar p-4 flex gap-4 items-start h-full pb-8">
                                 {['todo', 'doing', 'done'].map(colId => {
                                     const colTasks = filteredTasks.filter(t => t.status === colId);
                                     const colLabel = colId === 'todo' 
-                                        ? (activeBoardId !== 'all' ? `${activeBoardObj.icon} ${activeBoardObj.name}` : 'QUEST LOG')
+                                        ? (activeBoardId !== 'all' ? `${activeBoardObj.name}` : 'QUEST LOG')
                                         : colId === 'doing' ? 'IN BATTLE' : 'VICTORY';
                                     const colColor = activeTheme[`col${colId.charAt(0).toUpperCase() + colId.slice(1)}`];
 
                                     return (
-                                        <div key={colId} className="w-[88vw] max-w-[360px] h-full flex-shrink-0 snap-center flex flex-col pixel-box relative" style={{ backgroundColor: colColor }}>
-                                            <div className="p-3 border-b-4 border-black/50 bg-black/20 flex items-center justify-between text-white font-arcade text-xs sticky top-0 z-10 backdrop-blur-sm">
+                                        <div key={colId} className="w-[88vw] max-w-[360px] h-full flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden !rounded-t-[4px] !rounded-b-[40px]" style={{ backgroundColor: colColor }}>
+                                            <div className="p-3 border-b-4 border-black/50 bg-black/20 flex items-center justify-between text-white text-xs sticky top-0 z-10 backdrop-blur-sm">
                                                 <span className="truncate pr-2">{colLabel} <span className="opacity-50 text-[10px]">({colTasks.length})</span></span>
                                                 {colId === 'todo' && (
                                                     <button onClick={() => { sound.playBlip(); setIsAddingQuest(true); }} className="bg-yellow-400 text-black px-2 py-1 pixel-box-sm active:scale-90 flex-shrink-0">
@@ -536,7 +581,7 @@
                                             </div>
                                             <div className="p-3 overflow-y-auto hide-scrollbar flex-1 flex flex-col gap-3 pb-safe">
                                                 {colTasks.length === 0 && (
-                                                    <div className="text-center opacity-50 font-arcade text-[10px] py-8 text-black">
+                                                    <div className="text-center opacity-50 text-[10px] py-8 text-black">
                                                         {colId === 'todo' ? 'CLEAR!\n+ Add a task' : 'NO ACTIVE QUESTS'}
                                                     </div>
                                                 )}
@@ -548,13 +593,13 @@
                             </div>
                         )}
 
-                        {/* TAB: LIST VIEW */}
+                        {}
                         {activeTab === 'list' && (
                             <div className="flex-1 overflow-y-auto p-4 pb-safe hide-scrollbar bg-black/5 h-full">
                                 <div className="max-w-[500px] mx-auto pixel-box bg-white/50 p-4" style={{ backgroundColor: activeTheme.windowBg }}>
                                     <div className="flex justify-between items-center mb-6 border-b-4 pb-2" style={{ borderColor: activeTheme.border }}>
-                                        <h2 className="font-arcade text-sm">{activeBoardId !== 'all' ? `${activeBoardObj.icon} ${activeBoardObj.name}` : 'ALL QUESTS'}</h2>
-                                        <button onClick={() => { sound.playBlip(); setIsAddingQuest(true); }} className="bg-yellow-400 text-black px-2 py-1 pixel-box-sm font-arcade text-[10px] active:scale-90">
+                                        <h2 className="text-sm">{activeBoardId !== 'all' ? `${activeBoardObj.name}` : 'ALL QUESTS'}</h2>
+                                        <button onClick={() => { sound.playBlip(); setIsAddingQuest(true); }} className="bg-yellow-400 text-black px-2 py-1 pixel-box-sm text-[10px] active:scale-90">
                                             + ADD QUEST
                                         </button>
                                     </div>
@@ -565,7 +610,7 @@
                                         
                                         return (
                                             <div key={group} className="mb-6">
-                                                <h3 className="font-arcade text-[10px] opacity-60 mb-2 uppercase tracking-widest flex items-center gap-2">
+                                                <h3 className="text-[10px] opacity-60 mb-2 uppercase tracking-widest flex items-center gap-2">
                                                     <span className="w-full h-0.5 bg-black/20 block"></span>
                                                     <span className="whitespace-nowrap">{group}</span>
                                                     <span className="w-full h-0.5 bg-black/20 block"></span>
@@ -579,7 +624,7 @@
 
                                     {filteredTasks.filter(t => t.status === 'done').length > 0 && (
                                         <div className="mt-8 opacity-60">
-                                            <h3 className="font-arcade text-[10px] mb-2 uppercase text-center">VICTORY (DONE)</h3>
+                                            <h3 className="text-[10px] mb-2 uppercase text-center">VICTORY (DONE)</h3>
                                             <div className="flex flex-col gap-2">
                                                 {filteredTasks.filter(t => t.status === 'done').map(t => <TaskCard key={t.id} task={t} compact={true} />)}
                                             </div>
@@ -589,7 +634,7 @@
                             </div>
                         )}
 
-                        {/* TAB: TAVERN (SHOP) */}
+                        {}
                         {activeTab === 'shop' && (
                             <div className="flex-1 overflow-y-auto p-4 pb-safe hide-scrollbar tavern-rewards h-full">
                                 <style>{`
@@ -606,26 +651,25 @@
 
                                 <div className="max-w-[500px] mx-auto">
                                     <div className="text-center mb-6 p-4 pixel-box bg-white/20" style={{ borderColor: activeTheme.border }}>
-                                        <h2 className="font-arcade text-lg mb-2">THE TAVERN 🏪</h2>
-                                        <p className="font-arcade text-[10px] mb-4">SPEND HARD EARNED GOLD!</p>
-                                        <div className="inline-block pixel-box-sm bg-black text-yellow-400 px-4 py-2 font-arcade text-xl">
+                                        <h2 className="text-lg mb-2">THE TAVERN</h2>
+                                        <p className="text-[10px] mb-4">SPEND HARD EARNED GOLD!</p>
+                                        <div className="inline-block pixel-box-sm bg-black text-yellow-400 px-4 py-2 text-xl">
                                             🪙 {Number.isNaN(gold) ? 0 : gold} G
                                         </div>
                                     </div>
 
                                     {/* Rewards Section */}
                                     <div className="pixel-box-sm p-4 mb-6" style={{ backgroundColor: activeTheme.windowBg }}>
-                                        <h3 className="font-arcade text-[12px] mb-4" style={{ color: activeTheme.primary }}>REAL LIFE REWARDS</h3>
+                                        <h3 className="text-[12px] mb-4" style={{ color: activeTheme.primary }}>REAL LIFE REWARDS</h3>
                                         <div className="grid grid-cols-1 gap-3">
                                             {SHOP_REWARDS.map(r => (
                                                 <div key={r.id} className="flex justify-between items-center p-3 pixel-box-sm bg-white/50">
                                                     <div className="flex items-center gap-3">
-                                                        <span className="text-xl">{r.icon}</span>
-                                                        <span className="font-arcade text-[10px] max-w-[150px] leading-tight">{r.name}</span>
+                                                        <span className="text-[10px] max-w-[150px] leading-tight">{r.name}</span>
                                                     </div>
                                                     <button 
                                                         onClick={() => handleBuyReward(r.cost)}
-                                                        className={`buy-btn pixel-box-sm px-3 py-2 font-arcade text-[10px] active:scale-90 flex-shrink-0 ${gold >= r.cost ? '' : 'opacity-50'}`}
+                                                        className={`buy-btn pixel-box-sm px-3 py-2 text-[10px] active:scale-90 flex-shrink-0 ${gold >= r.cost ? '' : 'opacity-50'}`}
                                                     >
                                                         {r.cost}G
                                                     </button>
@@ -634,24 +678,9 @@
                                         </div>
                                     </div>
 
-                                    {/* Font Settings */}
-                                    <div className="pixel-box-sm p-4 mb-6" style={{ backgroundColor: activeTheme.windowBg }}>
-                                        <h3 className="font-arcade text-[12px] mb-4" style={{ color: activeTheme.primary }}>🔤 ACTIVE FONT</h3>
-                                        <select 
-                                            value={appFont} 
-                                            onChange={(e) => { sound.playBlip(); setAppFont(e.target.value); }}
-                                            className="w-full pixel-box-sm p-3 font-arcade text-[10px] focus:outline-none bg-white"
-                                        >
-                                            <option value="silkscreen">SILKSCREEN</option>
-                                            <option value="vt323">VT323 (Terminal)</option>
-                                            <option value="jetbrains">JETBRAINS MONO</option>
-                                            <option value="plex">IBM PLEX MONO</option>
-                                        </select>
-                                    </div>
-
                                     {/* Themes Section */}
                                     <div className="pixel-box-sm p-4 mb-6" style={{ backgroundColor: activeTheme.windowBg }}>
-                                        <h3 className="font-arcade text-[12px] mb-4" style={{ color: activeTheme.primary }}>🎨 UNLOCK THEMES</h3>
+                                        <h3 className="text-[12px] mb-4" style={{ color: activeTheme.primary }}>🎨 UNLOCK THEMES</h3>
                                         <div className="grid grid-cols-1 gap-3">
                                             {Object.values(RETRO_THEMES).map(t => {
                                                 const isUnlocked = unlockedThemes.includes(t.id);
@@ -660,19 +689,19 @@
                                                     <div key={t.id} className="flex justify-between items-center p-3 pixel-box-sm bg-white/50">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-6 h-6 pixel-box-sm flex-shrink-0" style={{ backgroundColor: t.bg, borderColor: t.border }}></div>
-                                                            <span className="font-arcade text-[10px]">{t.name}</span>
+                                                            <span className="text-[10px]">{t.name}</span>
                                                         </div>
                                                         {isUnlocked ? (
                                                             <button 
                                                                 onClick={() => { sound.playBlip(); setThemeKey(t.id); }}
-                                                                className={`pixel-box-sm px-3 py-2 font-arcade text-[10px] active:scale-90 ${isActive ? 'bg-green-500 text-white' : 'bg-gray-200 text-black'}`}
+                                                                className={`pixel-box-sm px-3 py-2 text-[10px] active:scale-90 ${isActive ? 'bg-green-500 text-white' : 'bg-gray-200 text-black'}`}
                                                             >
                                                                 {isActive ? 'ACTIVE' : 'EQUIP'}
                                                             </button>
                                                         ) : (
                                                             <button 
                                                                 onClick={() => handleBuyTheme(t.id, t.cost)}
-                                                                className={`buy-btn pixel-box-sm px-3 py-2 font-arcade text-[10px] active:scale-90 flex-shrink-0 ${gold >= t.cost ? '' : 'opacity-50'}`}
+                                                                className={`buy-btn pixel-box-sm px-3 py-2 text-[10px] active:scale-90 flex-shrink-0 ${gold >= t.cost ? '' : 'opacity-50'}`}
                                                             >
                                                                 {t.cost}G
                                                             </button>
@@ -689,9 +718,52 @@
                         
                     </main>
 
-                    {/* --- ABSOLUTE BOSS FIGHT MODE --- */}
+                    {}
+                    {/* --- STAT CARD MODAL --- */}
+                    {showStatsModal && (
+                        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                            <div className="w-full max-w-xs pixel-box bg-white p-6 animate-pop relative" style={{ backgroundColor: activeTheme.windowBg }}>
+                                <button 
+                                    onClick={() => { sound.playBlip(); setShowStatsModal(false); }}
+                                    className="absolute top-2 right-3 text-red-500 font-bold p-2 active:scale-90 text-sm"
+                                >
+                                    X
+                                </button>
+                                <div className="flex flex-col items-center mb-6">
+                                    <HeroAvatar />
+                                    <h2 className="text-xl mt-3 text-black">TYLER</h2>
+                                    <p className="text-[10px] opacity-70 text-black">HERO RANK</p>
+                                </div>
+                                
+                                <div className="mb-6">
+                                    <div className="flex justify-between text-[10px] mb-2 text-black">
+                                        <span>LEVEL {level}</span>
+                                        <span className="text-yellow-600">{xp % 100} / 100 XP</span>
+                                    </div>
+                                    <div className="w-full h-4 pixel-box-sm bg-black/10 p-0.5">
+                                        <div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${Math.max(5, xp % 100)}%` }}></div>
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-4 text-center">
+                                    <div className="pixel-box-sm p-3 bg-black/5 text-black">
+                                        <div className="text-xl text-yellow-600 mb-1">🪙</div>
+                                        <div className="text-sm">{Number.isNaN(gold) ? 0 : gold}</div>
+                                        <div className="text-[8px] opacity-70 mt-1">TOTAL GOLD</div>
+                                    </div>
+                                    <div className="pixel-box-sm p-3 bg-black/5 text-black">
+                                        <div className="text-xl text-blue-500 mb-1">⚔️</div>
+                                        <div className="text-sm">{tasks.filter(t => t.status === 'done').length}</div>
+                                        <div className="text-[8px] opacity-70 mt-1">QUESTS DONE</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {}
                     {focusTaskId && (
-                        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/95 p-4 sm:p-6 font-arcade text-white overflow-hidden">
+                        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/95 p-4 sm:p-6 text-white overflow-hidden">
                             <style>{`
                                 @keyframes shake { 0% { transform: translate(1px, 1px) rotate(0deg); } 10% { transform: translate(-1px, -2px) rotate(-1deg); } 20% { transform: translate(-3px, 0px) rotate(1deg); } 30% { transform: translate(3px, 2px) rotate(0deg); } 40% { transform: translate(1px, -1px) rotate(1deg); } 50% { transform: translate(-1px, 2px) rotate(-1deg); } 60% { transform: translate(-3px, 1px) rotate(0deg); } 70% { transform: translate(3px, 1px) rotate(-1deg); } 80% { transform: translate(-1px, -1px) rotate(1deg); } 90% { transform: translate(1px, 2px) rotate(0deg); } 100% { transform: translate(1px, -2px) rotate(-1deg); } }
                                 .boss-shake { animation: shake 0.5s; animation-iteration-count: infinite; }
@@ -704,15 +776,23 @@
                                 
                                 {tasks.find(t => t.id === focusTaskId) && (
                                     <div className="boss-shake pixel-box bg-red-900 border-red-500 p-6 sm:p-8 mb-8 w-full">
-                                        <div className="text-5xl mb-6">👾</div>
+                                        <div className="flex justify-center mb-6">
+                                            <svg width="48" height="48" viewBox="0 0 16 16" fill="white">
+                                                <rect x="4" y="2" width="8" height="8" />
+                                                <rect x="5" y="10" width="6" height="4" />
+                                                <rect x="5" y="5" width="2" height="2" fill="var(--app-hudBg, #000)"/>
+                                                <rect x="9" y="5" width="2" height="2" fill="var(--app-hudBg, #000)"/>
+                                                <rect x="7" y="8" width="2" height="1" fill="var(--app-hudBg, #000)"/>
+                                            </svg>
+                                        </div>
                                         <p className="text-sm leading-loose mb-6 break-words">{tasks.find(t => t.id === focusTaskId).text}</p>
                                         
                                         <div className="flex gap-4 mt-6">
                                             <button 
-                                                onClick={() => handleToggleTaskStatus(tasks.find(t => t.id === focusTaskId))}
+                                                onClick={() => handleDefeatBoss(focusTaskId)}
                                                 className="flex-1 bg-red-500 text-white pixel-box-sm py-4 active:bg-white active:text-red-500 text-xs"
                                             >
-                                                ATTACK (COMPLETE)
+                                                ATTACK
                                             </button>
                                             <button 
                                                 onClick={() => { sound.playError(); setFocusTaskId(null); }}
@@ -727,80 +807,88 @@
                         </div>
                     )}
 
-                    {/* --- ADD QUEST MODAL --- */}
+                    {}
                     {isAddingQuest && (
                         <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
                             <div className="w-full max-w-md pixel-box bg-white p-6 animate-pop pb-safe max-h-[90vh] overflow-y-auto hide-scrollbar" style={{ backgroundColor: activeTheme.windowBg }}>
-                                <h2 className="font-arcade text-sm mb-4">NEW QUEST</h2>
+                                <h2 className="text-sm mb-4">NEW QUEST</h2>
                                 <form onSubmit={(e) => {
                                     e.preventDefault();
                                     const fd = new FormData(e.target);
                                     
                                     const subs = [];
-                                    if(fd.get('sub1').trim()) subs.push({id: 's1_'+Date.now(), text: fd.get('sub1').trim(), done: false});
-                                    if(fd.get('sub2').trim()) subs.push({id: 's2_'+Date.now(), text: fd.get('sub2').trim(), done: false});
-                                    if(fd.get('sub3').trim()) subs.push({id: 's3_'+Date.now(), text: fd.get('sub3').trim(), done: false});
+                                    if(fd.get('sub1') && fd.get('sub1').trim()) subs.push({id: 's1_'+Date.now(), text: fd.get('sub1').trim(), done: false});
+                                    if(fd.get('sub2') && fd.get('sub2').trim()) subs.push({id: 's2_'+Date.now(), text: fd.get('sub2').trim(), done: false});
+                                    if(fd.get('sub3') && fd.get('sub3').trim()) subs.push({id: 's3_'+Date.now(), text: fd.get('sub3').trim(), done: false});
 
                                     handleAddTask(fd.get('text'), fd.get('date'), fd.get('boardId'), subs);
                                 }}>
                                     <textarea 
                                         name="text" required autoFocus
                                         placeholder="What needs doing?"
-                                        className="w-full pixel-box-sm p-3 font-sans text-sm mb-4 min-h-[80px] bg-white text-black focus:outline-none"
+                                        className="w-full pixel-box-sm p-3 text-sm mb-4 min-h-[80px] bg-white text-black focus:outline-none"
                                     ></textarea>
 
-                                    <div className="mb-4 space-y-2">
-                                        <p className="font-arcade text-[8px] opacity-70">SUBTASKS (OPTIONAL)</p>
-                                        <input type="text" name="sub1" placeholder="- Subtask 1" className="w-full pixel-box-sm p-2 font-sans text-xs bg-white/70 text-black focus:outline-none" />
-                                        <input type="text" name="sub2" placeholder="- Subtask 2" className="w-full pixel-box-sm p-2 font-sans text-xs bg-white/70 text-black focus:outline-none" />
-                                        <input type="text" name="sub3" placeholder="- Subtask 3" className="w-full pixel-box-sm p-2 font-sans text-xs bg-white/70 text-black focus:outline-none" />
-                                    </div>
+                                    {!showSubtasksInput ? (
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setShowSubtasksInput(true)} 
+                                            className="w-full pixel-box-sm py-3 text-[10px] bg-white/50 text-black mb-4 border-dashed border-2 active:bg-gray-100"
+                                        >
+                                            + ADD SUBTASKS
+                                        </button>
+                                    ) : (
+                                        <div className="mb-4 space-y-2">
+                                            <div className="flex justify-between items-center opacity-70">
+                                                <p className="text-[8px]">SUBTASKS (OPTIONAL)</p>
+                                                <button type="button" onClick={() => setShowSubtasksInput(false)} className="text-red-500 text-[10px]">X</button>
+                                            </div>
+                                            <input type="text" name="sub1" placeholder="- Subtask 1" className="w-full pixel-box-sm p-2 text-xs bg-white/70 text-black focus:outline-none" />
+                                            <input type="text" name="sub2" placeholder="- Subtask 2" className="w-full pixel-box-sm p-2 text-xs bg-white/70 text-black focus:outline-none" />
+                                            <input type="text" name="sub3" placeholder="- Subtask 3" className="w-full pixel-box-sm p-2 text-xs bg-white/70 text-black focus:outline-none" />
+                                        </div>
+                                    )}
                                     
                                     <div className="flex gap-2 mb-4">
-                                        <button type="button" onClick={(e) => { e.currentTarget.parentElement.nextElementSibling.value = getTodayStr(); }} className="flex-1 pixel-box-sm py-2 font-arcade text-[10px] bg-gray-200 text-black active:bg-yellow-400">TODAY</button>
-                                        <button type="button" onClick={(e) => { e.currentTarget.parentElement.nextElementSibling.value = getTomorrowStr(); }} className="flex-1 pixel-box-sm py-2 font-arcade text-[10px] bg-gray-200 text-black active:bg-yellow-400">TMRW</button>
+                                        <button type="button" onClick={(e) => { e.currentTarget.parentElement.nextElementSibling.value = getTodayStr(); }} className="flex-1 pixel-box-sm py-2 text-[10px] bg-gray-200 text-black active:bg-yellow-400">TODAY</button>
+                                        <button type="button" onClick={(e) => { e.currentTarget.parentElement.nextElementSibling.value = getTomorrowStr(); }} className="flex-1 pixel-box-sm py-2 text-[10px] bg-gray-200 text-black active:bg-yellow-400">TMRW</button>
                                     </div>
-                                    <input type="date" name="date" defaultValue={getTodayStr()} className="w-full pixel-box-sm p-3 font-arcade text-[10px] mb-4 bg-white text-black" />
+                                    <div className="w-full mb-4">
+                                        <input type="date" name="date" defaultValue={getTodayStr()} className="w-full pixel-box-sm p-3 text-[10px] bg-white text-black block" />
+                                    </div>
                                     
-                                    <select name="boardId" defaultValue={activeBoardId} className="w-full pixel-box-sm p-3 font-arcade text-[10px] mb-6 bg-white text-black">
-                                        {boards.map(b => <option key={b.id} value={b.id}>{b.icon} {b.name}</option>)}
+                                    <select name="boardId" defaultValue={activeBoardId} className="w-full pixel-box-sm p-3 text-[10px] mb-6 bg-white text-black">
+                                        {boards.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                                     </select>
                                     
                                     <div className="flex gap-3">
-                                        <button type="button" onClick={() => { sound.playBlip(); setIsAddingQuest(false); }} className="flex-1 pixel-box-sm py-3 font-arcade text-xs bg-gray-300 text-black active:scale-95">CANCEL</button>
-                                        <button type="submit" className="flex-1 pixel-box-sm py-3 font-arcade text-xs bg-green-500 text-white active:scale-95">SAVE</button>
+                                        <button type="button" onClick={() => { sound.playBlip(); setIsAddingQuest(false); setShowSubtasksInput(false); }} className="flex-1 pixel-box-sm py-3 text-xs bg-gray-300 text-black active:scale-95">CANCEL</button>
+                                        <button type="submit" className="flex-1 pixel-box-sm py-3 text-xs bg-green-500 text-white active:scale-95">SAVE</button>
                                     </div>
                                 </form>
                             </div>
                         </div>
                     )}
 
+                    {}
                     {/* --- MANAGE BOARD MODAL --- */}
                     {isManagingBoard && (
                         <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
                             <div className="w-full max-w-md pixel-box bg-white p-6 animate-pop" style={{ backgroundColor: activeTheme.windowBg }}>
-                                <h2 className="font-arcade text-sm mb-4">CREATE BOARD</h2>
+                                <h2 className="text-sm mb-4">CREATE BOARD</h2>
                                 <form onSubmit={(e) => {
                                     e.preventDefault();
                                     const fd = new FormData(e.target);
-                                    const newBoard = { id: 'b_'+Date.now(), name: fd.get('name').toUpperCase(), icon: fd.get('icon') };
+                                    const newBoard = { id: 'b_'+Date.now(), name: fd.get('name').toUpperCase() };
                                     setBoards([...boards, newBoard]);
                                     setActiveBoardId(newBoard.id);
                                     sound.playCoin();
                                     setIsManagingBoard(false);
                                 }}>
-                                    <input type="text" name="name" required placeholder="BOARD NAME" maxLength="15" className="w-full pixel-box-sm p-3 font-arcade text-[10px] mb-4 bg-white text-black focus:outline-none" />
-                                    <select name="icon" className="w-full pixel-box-sm p-3 font-arcade text-[12px] mb-6 bg-white text-black text-center">
-                                        <option value="⚔️">⚔️ Swords</option>
-                                        <option value="🧹">🧹 Broom</option>
-                                        <option value="💻">💻 Laptop</option>
-                                        <option value="🛒">🛒 Cart</option>
-                                        <option value="🔮">🔮 Crystal</option>
-                                        <option value="🏋️">🏋️ Weights</option>
-                                    </select>
+                                    <input type="text" name="name" required placeholder="BOARD NAME" maxLength="15" className="w-full pixel-box-sm p-3 text-[10px] mb-6 bg-white text-black focus:outline-none" />
                                     <div className="flex gap-3">
-                                        <button type="button" onClick={() => { sound.playBlip(); setIsManagingBoard(false); }} className="flex-1 pixel-box-sm py-3 font-arcade text-xs bg-gray-300 text-black active:scale-95">CANCEL</button>
-                                        <button type="submit" className="flex-1 pixel-box-sm py-3 font-arcade text-xs bg-blue-500 text-white active:scale-95">CREATE</button>
+                                        <button type="button" onClick={() => { sound.playBlip(); setIsManagingBoard(false); }} className="flex-1 pixel-box-sm py-3 text-xs bg-gray-300 text-black active:scale-95">CANCEL</button>
+                                        <button type="submit" className="flex-1 pixel-box-sm py-3 text-xs bg-blue-500 text-white active:scale-95">CREATE</button>
                                     </div>
                                 </form>
                             </div>
@@ -810,7 +898,6 @@
                 </div>
             );
 
-            // Helper component for tasks
             function TaskCard({ task, compact = false }) {
                 const isOverdue = task.dueDate && task.dueDate < getTodayStr() && task.status !== 'done';
                 const isDone = task.status === 'done';
@@ -821,13 +908,13 @@
                         <div className="flex items-start gap-3">
                             <button 
                                 onClick={() => handleToggleTaskStatus(task)}
-                                className={`w-6 h-6 flex-shrink-0 pixel-box-sm flex items-center justify-center font-sans text-xs active:scale-90 mt-0.5 ${isDone ? 'bg-black text-white' : 'bg-white'}`}
+                                className={`w-6 h-6 flex-shrink-0 pixel-box-sm flex items-center justify-center text-xs active:scale-90 mt-0.5 ${isDone ? 'bg-black text-white' : 'bg-white'}`}
                             >
                                 {task.status === 'doing' ? 'O' : task.status === 'done' ? 'X' : ''}
                             </button>
                             
                             <div className="flex-1 min-w-0">
-                                <p className={`font-sans text-sm mb-2 break-words leading-tight ${isDone ? 'line-through' : ''}`}>
+                                <p className={`text-sm mb-2 break-words leading-tight ${isDone ? 'line-through' : ''}`}>
                                     {task.text}
                                 </p>
                                 
@@ -839,24 +926,24 @@
                                                     onClick={(e) => { e.stopPropagation(); handleToggleSubtask(task.id, idx); }}
                                                     className={`w-3.5 h-3.5 flex-shrink-0 pixel-box-sm flex items-center justify-center ${sub.done ? 'bg-green-500 text-white' : 'bg-white'}`}
                                                 >
-                                                    {sub.done && <span className="text-[8px] font-sans leading-none">X</span>}
+                                                    {sub.done && <span className="text-[8px] leading-none">X</span>}
                                                 </button>
-                                                <span className={`font-sans text-xs leading-tight ${sub.done ? 'line-through opacity-50' : ''}`}>{sub.text}</span>
+                                                <span className={`text-xs leading-tight ${sub.done ? 'line-through opacity-50' : ''}`}>{sub.text}</span>
                                             </div>
                                         ))}
                                     </div>
                                 )}
                                 
                                 <div className="flex flex-wrap gap-2 items-center">
-                                    <span className="bg-yellow-200 text-black px-1.5 py-0.5 pixel-box-sm font-arcade text-[8px]">+50XP</span>
+                                    <span className="bg-yellow-200 text-black px-1.5 py-0.5 pixel-box-sm text-[8px]">+50XP</span>
                                     {task.dueDate && !isDone && (
-                                        <span className={`px-1.5 py-0.5 pixel-box-sm font-arcade text-[8px] flex items-center gap-1 ${isOverdue ? 'bg-red-500 text-white animate-pulse' : 'bg-white text-black'}`}>
+                                        <span className={`px-1.5 py-0.5 pixel-box-sm text-[8px] flex items-center gap-1 ${isOverdue ? 'bg-red-500 text-white animate-pulse' : 'bg-white text-black'}`}>
                                             📅 {task.dueDate === getTodayStr() ? 'TODAY' : task.dueDate === getTomorrowStr() ? 'TMRW' : task.dueDate}
                                         </span>
                                     )}
                                     {activeBoardId === 'all' && task.boardId !== 'general' && (
-                                        <span className="px-1.5 py-0.5 pixel-box-sm font-arcade text-[8px] bg-blue-200 text-black">
-                                            {boards.find(b => b.id === task.boardId)?.icon} {boards.find(b => b.id === task.boardId)?.name}
+                                        <span className="px-1.5 py-0.5 pixel-box-sm text-[8px] bg-blue-200 text-black">
+                                            {boards.find(b => b.id === task.boardId)?.name || 'Board'}
                                         </span>
                                     )}
                                 </div>
@@ -866,7 +953,7 @@
                         {/* Hover/Active Actions */}
                         <div className="mt-3 pt-3 border-t-2 border-black/10 flex justify-between items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                             {isOverdue ? (
-                                <button onClick={() => handleRerollTask(task.id)} className="bg-purple-500 text-white px-2 py-1 pixel-box-sm font-arcade text-[8px] active:scale-95 flex items-center gap-1">
+                                <button onClick={() => handleRerollTask(task.id)} className="bg-purple-500 text-white px-2 py-1 pixel-box-sm text-[8px] active:scale-95 flex items-center gap-1">
                                     🎲 REROLL (5G)
                                 </button>
                             ) : <div></div>}
@@ -879,7 +966,6 @@
                 );
             }
 
-            // Date Group Helper
             function getTaskGroup(dateStr) {
                 if (!dateStr) return 'No Date';
                 if (dateStr === getTodayStr()) return 'Today';
