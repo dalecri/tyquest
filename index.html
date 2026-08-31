@@ -60,6 +60,14 @@
         }
         .animate-pop { animation: pop 0.2s ease-out forwards; }
 
+        @keyframes flicker {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            45% { opacity: 0.85; transform: scale(0.94); }
+            50% { opacity: 1; transform: scale(1.08); }
+            55% { opacity: 0.92; transform: scale(0.97); }
+        }
+        .animate-flicker { animation: flicker 1.8s ease-in-out infinite; }
+
         .pb-safe { padding-bottom: env(safe-area-inset-bottom, 24px); }
         .pt-safe { padding-top: env(safe-area-inset-top, 12px); }
         
@@ -284,6 +292,11 @@
             d.setDate(d.getDate() + 1);
             return d.toISOString().split('T')[0];
         };
+        const addDays = (dateStr, days) => {
+            const d = new Date(dateStr);
+            d.setUTCDate(d.getUTCDate() + days);
+            return d.toISOString().split('T')[0];
+        };
 
         // --- JSONBin.io sync (no email account needed, just an API key + a shared Bin ID) ---
         const JSONBIN_BASE = 'https://api.jsonbin.io/v3/b';
@@ -390,6 +403,18 @@
             
             const [isAddingQuest, setIsAddingQuest] = useState(false);
             const [showSubtasksInput, setShowSubtasksInput] = useState(false);
+            const [questDateChoice, setQuestDateChoice] = useState('today'); // 'today' | 'tomorrow' | 'custom'
+            const [questDateValue, setQuestDateValue] = useState(getTodayStr());
+            const [questRecurrence, setQuestRecurrence] = useState(null); // null | 'daily' | 'weekly'
+
+            // Reset the quick-pick date + recurrence choice each time the New Quest form opens
+            useEffect(() => {
+                if (isAddingQuest) {
+                    setQuestDateChoice('today');
+                    setQuestDateValue(getTodayStr());
+                    setQuestRecurrence(null);
+                }
+            }, [isAddingQuest]);
             
             const [isManagingBoard, setIsManagingBoard] = useState(false);
             const [isAddingLibCat, setIsAddingLibCat] = useState(false);
@@ -593,14 +618,15 @@
                 }
             };
 
-            const handleAddTask = (text, date, boardId, subtasksArr) => {
+            const handleAddTask = (text, date, boardId, subtasksArr, recurrence) => {
                 const newTask = {
                     id: Date.now().toString(),
                     text,
                     status: 'todo',
                     boardId: boardId === 'all' ? 'general' : boardId,
                     dueDate: date,
-                    subtasks: subtasksArr || []
+                    subtasks: subtasksArr || [],
+                    recurrence: recurrence || null
                 };
                 setTasks([newTask, ...tasks]);
                 sound.playBlip(600);
@@ -608,38 +634,47 @@
                 setShowSubtasksInput(false);
             };
 
-            const handleToggleTaskStatus = (task) => {
-                if (task.status === 'done') return;
+            // Shared by the checkbox toggle, the boss-defeat screen, and drag-to-Victory —
+            // marks a task done, pays out XP/Gold, and spawns the next occurrence if it repeats.
+            const completeTask = (task) => {
+                if (!task || task.status === 'done') return;
 
-                let nextStatus = 'doing';
-                if (task.status === 'todo') nextStatus = 'doing';
-                else if (task.status === 'doing') nextStatus = 'done';
+                setTasks(prevTasks => {
+                    const updated = prevTasks.map(t => t.id === task.id ? { ...t, status: 'done', completedAt: getTodayStr() } : t);
+                    if (!task.recurrence) return updated;
 
-                setTasks(tasks.map(t => t.id === task.id ? { ...t, status: nextStatus, completedAt: nextStatus === 'done' ? getTodayStr() : null } : t));
+                    const nextDue = addDays(getTodayStr(), task.recurrence === 'weekly' ? 7 : 1);
+                    const clone = {
+                        ...task,
+                        id: Date.now().toString() + '_r',
+                        status: 'todo',
+                        completedAt: null,
+                        dueDate: nextDue,
+                        subtasks: (task.subtasks || []).map(s => ({ ...s, done: false }))
+                    };
+                    return [clone, ...updated];
+                });
 
-                if (nextStatus === 'done') {
-                    sound.playCoin();
-                    triggerConfetti();
-                    setXp(prev => prev + 50);
-                    setGold(prev => prev + 10);
-                } else {
-                    sound.playBlip(300);
-                }
-                
-                if (focusTaskId === task.id && nextStatus === 'done') {
-                    setFocusTaskId(null);
-                }
-            };
-
-            const handleDefeatBoss = (task) => {
-                if (task.status === 'done') return;
-                setTasks(tasks.map(t => t.id === task.id ? { ...t, status: 'done', completedAt: getTodayStr() } : t));
                 sound.playCoin();
                 triggerConfetti();
                 setXp(prev => prev + 50);
                 setGold(prev => prev + 10);
-                setFocusTaskId(null);
+
+                if (focusTaskId === task.id) setFocusTaskId(null);
             };
+
+            const handleToggleTaskStatus = (task) => {
+                if (task.status === 'done') return;
+
+                if (task.status === 'todo') {
+                    setTasks(tasks.map(t => t.id === task.id ? { ...t, status: 'doing' } : t));
+                    sound.playBlip(300);
+                } else if (task.status === 'doing') {
+                    completeTask(task);
+                }
+            };
+
+            const handleDefeatBoss = (task) => completeTask(task);
 
             const handleToggleSubtask = (taskId, subIdx) => {
                 setTasks(tasks.map(t => {
@@ -677,25 +712,13 @@
             const moveTaskToStatus = (task, nextStatus) => {
                 if (!task || task.status === nextStatus || task.status === 'done') return;
 
-                setTasks(prevTasks => prevTasks.map(t => {
-                    if (t.id === task.id) {
-                        return { ...t, status: nextStatus, completedAt: nextStatus === 'done' ? getTodayStr() : t.completedAt };
-                    }
-                    return t;
-                }));
-
                 if (nextStatus === 'done') {
-                    sound.playCoin();
-                    triggerConfetti();
-                    setXp(prev => prev + 50);
-                    setGold(prev => prev + 10);
-                } else {
-                    sound.playBlip(300);
+                    completeTask(task);
+                    return;
                 }
 
-                if (focusTaskId === task.id && nextStatus === 'done') {
-                    setFocusTaskId(null);
-                }
+                setTasks(prevTasks => prevTasks.map(t => t.id === task.id ? { ...t, status: nextStatus } : t));
+                sound.playBlip(300);
             };
 
             // Hold-to-drag: works the same for mouse and touch via the Pointer Events API.
@@ -1165,7 +1188,10 @@
                         )}
 
                         {activeTab === 'shop' && (
-                            <div className="flex-1 overflow-y-auto p-4 pb-safe hide-scrollbar tavern-rewards h-full">
+                            <div 
+                                className="flex-1 overflow-y-auto p-4 pb-safe hide-scrollbar tavern-rewards h-full"
+                                style={{ backgroundImage: `repeating-linear-gradient(45deg, ${activeTheme.border}0d 0px, ${activeTheme.border}0d 2px, transparent 2px, transparent 14px)` }}
+                            >
                                 <style>{`
                                     .tavern-rewards .pixel-box-sm {
                                         background-color: ${activeTheme.bg} !important;
@@ -1179,23 +1205,41 @@
                                 `}</style>
 
                                 <div className="max-w-[500px] mx-auto">
-                                    <div className="text-center mb-6 p-4 pixel-box bg-white/20" style={{ borderColor: activeTheme.border }}>
-                                        <h2 className="text-lg mb-2">THE TAVERN</h2>
-                                        <p className="text-[10px] mb-4">SPEND HARD EARNED GOLD!</p>
-                                        <div className="inline-block p-2">
-                                            <GoldBadge amount={Number.isNaN(gold) ? 0 : gold} />
+                                    {/* Signboard header */}
+                                    <div className="relative mb-6 pixel-box overflow-hidden" style={{ backgroundColor: activeTheme.hudBg, borderColor: activeTheme.border }}>
+                                        <div className="absolute inset-0 opacity-25 pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.2) 0px, rgba(0,0,0,0.2) 2px, transparent 2px, transparent 16px)' }}></div>
+                                        <div className="relative p-5 text-center" style={{ color: activeTheme.hudText }}>
+                                            <div className="flex items-center justify-center gap-3 mb-1">
+                                                <span className="text-xl animate-flicker">🔥</span>
+                                                <h2 className="text-lg">THE TAVERN</h2>
+                                                <span className="text-xl animate-flicker" style={{ animationDelay: '0.4s' }}>🔥</span>
+                                            </div>
+                                            <p className="text-[9px] opacity-80 mb-3">Trade quests for glory, not just gold</p>
+                                            <div className="flex items-center justify-center flex-wrap gap-2">
+                                                <GoldBadge amount={Number.isNaN(gold) ? 0 : gold} />
+                                                <span className="text-[8px] opacity-90 pixel-box-sm px-2 py-1 bg-black/25">
+                                                    🏆 {ACHIEVEMENTS.filter(a => a.check(achievementStats)).length}/{ACHIEVEMENTS.length}
+                                                </span>
+                                                <span className="text-[8px] opacity-90 pixel-box-sm px-2 py-1 bg-black/25">
+                                                    🎨 {unlockedThemes.length}/{Object.keys(RETRO_THEMES).length}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
 
                                     {/* Achievements Section */}
                                     <div className="pixel-box-sm p-4 mb-6" style={{ backgroundColor: activeTheme.windowBg }}>
                                         <h3 className="text-[12px] mb-4" style={{ color: activeTheme.primary }}>🏆 TROPHY CASE</h3>
-                                        <div className="grid grid-cols-1 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             {ACHIEVEMENTS.map(a => {
                                                 const unlocked = a.check(achievementStats);
                                                 return (
-                                                    <div key={a.id} className={`flex items-center gap-3 p-3 pixel-box-sm ${unlocked ? 'bg-white/70' : 'bg-black/10 opacity-60'}`}>
-                                                        <span className={`text-lg flex-shrink-0 ${unlocked ? '' : 'grayscale'}`}>{a.icon}</span>
+                                                    <div 
+                                                        key={a.id} 
+                                                        className={`flex items-center gap-3 p-3 pixel-box-sm border-l-4 ${unlocked ? 'bg-white/80' : 'bg-black/10 opacity-60'}`}
+                                                        style={{ borderLeftColor: unlocked ? activeTheme.primary : 'transparent' }}
+                                                    >
+                                                        <span className={`text-xl flex-shrink-0 ${unlocked ? '' : 'grayscale'}`}>{a.icon}</span>
                                                         <div className="flex-1 min-w-0">
                                                             <div className="text-[10px] leading-tight">{a.name}</div>
                                                             <div className="text-[8px] opacity-70 mt-0.5 leading-tight">{a.desc}</div>
@@ -1209,21 +1253,25 @@
 
                                     {/* Themes Section */}
                                     <div className="pixel-box-sm p-4 mb-6" style={{ backgroundColor: activeTheme.windowBg }}>
-                                        <h3 className="text-[12px] mb-4" style={{ color: activeTheme.primary }}>🎨 UNLOCK THEMES</h3>
-                                        <div className="grid grid-cols-1 gap-3">
+                                        <h3 className="text-[12px] mb-4" style={{ color: activeTheme.primary }}>🎨 WARDROBE</h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             {Object.values(RETRO_THEMES).map(t => {
                                                 const isUnlocked = unlockedThemes.includes(t.id);
                                                 const isActive = themeKey === t.id;
                                                 return (
-                                                    <div key={t.id} className="flex justify-between items-center p-3 pixel-box-sm bg-white/50">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-6 h-6 pixel-box-sm flex-shrink-0" style={{ backgroundColor: t.bg, borderColor: t.border }}></div>
-                                                            <span className="text-[10px]">{t.name}</span>
+                                                    <div key={t.id} className={`flex justify-between items-center p-3 pixel-box-sm bg-white/50 ${isActive ? 'ring-2 ring-yellow-400' : ''}`}>
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <div className="flex flex-shrink-0 pixel-box-sm overflow-hidden" style={{ borderColor: t.border }}>
+                                                                <div className="w-3 h-6" style={{ backgroundColor: t.bg }}></div>
+                                                                <div className="w-3 h-6" style={{ backgroundColor: t.primary }}></div>
+                                                                <div className="w-3 h-6" style={{ backgroundColor: t.colDone }}></div>
+                                                            </div>
+                                                            <span className="text-[10px] truncate">{t.name}</span>
                                                         </div>
                                                         {isUnlocked ? (
                                                             <button 
                                                                 onClick={() => { sound.playBlip(); setThemeKey(t.id); }}
-                                                                className={`pixel-box-sm px-3 py-2 text-[10px] active:scale-90 ${isActive ? 'bg-green-500 text-white' : 'bg-gray-200 text-black'}`}
+                                                                className={`pixel-box-sm px-3 py-2 text-[10px] active:scale-90 flex-shrink-0 ${isActive ? 'bg-green-500 text-white' : 'bg-gray-200 text-black'}`}
                                                             >
                                                                 {isActive ? 'ACTIVE' : 'EQUIP'}
                                                             </button>
@@ -1421,7 +1469,7 @@
                                     if(fd.get('sub2') && fd.get('sub2').trim()) subs.push({id: 's2_'+Date.now(), text: fd.get('sub2').trim(), done: false});
                                     if(fd.get('sub3') && fd.get('sub3').trim()) subs.push({id: 's3_'+Date.now(), text: fd.get('sub3').trim(), done: false});
 
-                                    handleAddTask(fd.get('text'), fd.get('date'), fd.get('boardId'), subs);
+                                    handleAddTask(fd.get('text'), questDateValue, fd.get('boardId'), subs, questRecurrence);
                                 }}>
                                     <textarea 
                                         name="text" required autoFocus
@@ -1450,11 +1498,44 @@
                                     )}
                                     
                                     <div className="flex gap-2 mb-4">
-                                        <button type="button" onClick={(e) => { e.currentTarget.parentElement.nextElementSibling.value = getTodayStr(); }} className="flex-1 pixel-box-sm py-2 text-[10px] bg-gray-200 text-black active:bg-yellow-400">TODAY</button>
-                                        <button type="button" onClick={(e) => { e.currentTarget.parentElement.nextElementSibling.value = getTomorrowStr(); }} className="flex-1 pixel-box-sm py-2 text-[10px] bg-gray-200 text-black active:bg-yellow-400">TMRW</button>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => { setQuestDateChoice('today'); setQuestDateValue(getTodayStr()); }} 
+                                            className={`flex-1 pixel-box-sm py-2 text-[10px] active:scale-95 ${questDateChoice === 'today' ? 'bg-yellow-400 text-black' : 'bg-gray-200 text-black'}`}
+                                        >
+                                            TODAY
+                                        </button>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => { setQuestDateChoice('tomorrow'); setQuestDateValue(getTomorrowStr()); }} 
+                                            className={`flex-1 pixel-box-sm py-2 text-[10px] active:scale-95 ${questDateChoice === 'tomorrow' ? 'bg-yellow-400 text-black' : 'bg-gray-200 text-black'}`}
+                                        >
+                                            TMRW
+                                        </button>
                                     </div>
                                     <div className="w-full mb-4">
-                                        <input type="date" name="date" defaultValue={getTodayStr()} className="w-full pixel-box-sm p-3 text-[10px] bg-white text-black block" />
+                                        <input 
+                                            type="date" name="date" 
+                                            value={questDateValue} 
+                                            onChange={(e) => { setQuestDateValue(e.target.value); setQuestDateChoice('custom'); }} 
+                                            className="w-full pixel-box-sm p-3 text-[10px] bg-white text-black block" 
+                                        />
+                                    </div>
+
+                                    <div className="mb-6">
+                                        <p className="text-[8px] mb-2 opacity-70">REPEAT (OPTIONAL)</p>
+                                        <div className="flex gap-2">
+                                            {[{ key: null, label: 'NONE' }, { key: 'daily', label: 'DAILY' }, { key: 'weekly', label: 'WEEKLY' }].map(opt => (
+                                                <button
+                                                    key={opt.label}
+                                                    type="button"
+                                                    onClick={() => setQuestRecurrence(opt.key)}
+                                                    className={`flex-1 pixel-box-sm py-2 text-[10px] active:scale-95 ${questRecurrence === opt.key ? 'bg-purple-400 text-white' : 'bg-gray-200 text-black'}`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
                                     
                                     <select name="boardId" defaultValue={activeBoardId} className="w-full pixel-box-sm p-3 text-[10px] mb-6 bg-white text-black">
@@ -1651,6 +1732,12 @@
                                     {task.dueDate && !isDone && (
                                         <span className={`px-1.5 py-0.5 pixel-box-sm text-[8px] flex items-center gap-1 ${isOverdue ? 'bg-red-500 text-white animate-pulse' : 'bg-white text-black'}`}>
                                             📅 {task.dueDate === getTodayStr() ? 'TODAY' : task.dueDate === getTomorrowStr() ? 'TMRW' : task.dueDate}
+                                        </span>
+                                    )}
+
+                                    {task.recurrence && !isDone && (
+                                        <span className="px-1.5 py-0.5 pixel-box-sm text-[8px] bg-purple-200 text-black">
+                                            🔁 {task.recurrence === 'daily' ? 'DAILY' : 'WEEKLY'}
                                         </span>
                                     )}
 
