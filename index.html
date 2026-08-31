@@ -137,6 +137,12 @@
         }
         const sound = new SoundManager();
 
+        // Layout constants for the activity heatmap's dynamic band-reflow (see activityLayout memo)
+        const ACTIVITY_GAP = 2;
+        const ACTIVITY_DAY_LABEL_W = 16;
+        const ACTIVITY_MONTH_LABEL_H = 11;
+        const ACTIVITY_BAND_GAP = 8;
+
         const RETRO_THEMES = {
             snes16bit: {
                 id: 'snes16bit', name: '16-Bit Town', isDark: false, cost: 0,
@@ -466,6 +472,7 @@
             // Custom pointer-based drag state (replaces native HTML5 DnD, which is unreliable on touch)
             const [dragState, setDragState] = useState(null); // { taskId, x, y, offsetX, offsetY, width, hoverColId }
             const dragCandidateRef = useRef(null); // pending drag before the hold threshold clears
+            const activityContainerRef = useRef(null);
             const dragTimerRef = useRef(null);
 
             // Cross-device sync (JSONBin.io) state
@@ -945,23 +952,69 @@
                 const weeks = [];
                 for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
 
-                const monthLabels = weeks.map((week, i) => {
-                    const firstDay = week.find(d => d);
-                    if (!firstDay) return null;
-                    const prevFirstDay = i > 0 ? weeks[i - 1].find(d => d) : null;
-                    if (!prevFirstDay || prevFirstDay.month !== firstDay.month) {
-                        return new Date(firstDay.date).toLocaleString('en-US', { month: 'short' });
-                    }
-                    return null;
-                });
-
-                return { weeks, monthLabels, totalCompleted: Object.values(counts).reduce((a, b) => a + b, 0) };
+                return { weeks, totalCompleted: Object.values(counts).reduce((a, b) => a + b, 0) };
             }, [tasks]);
 
             const activityIntensityStyle = (count) => {
                 if (!count) return { backgroundColor: activeTheme.border, opacity: 0.12 };
                 const opacityByLevel = [0, 0.4, 0.6, 0.8, 1];
                 return { backgroundColor: activeTheme.primary, opacity: opacityByLevel[Math.min(count, 4)] };
+            };
+
+            // Measure the actual space available for the heatmap so it can reflow into
+            // however many horizontal bands best fill THIS screen's shape — tall and narrow
+            // on a phone wraps into several stacked bands; wide gets fewer, larger ones.
+            const [activitySize, setActivitySize] = useState({ width: 0, height: 0 });
+            useEffect(() => {
+                if (!showActivity) return;
+                const el = activityContainerRef.current;
+                if (!el) return;
+                const measure = () => setActivitySize({ width: el.clientWidth, height: el.clientHeight });
+                measure();
+                const ro = new ResizeObserver(measure);
+                ro.observe(el);
+                return () => ro.disconnect();
+            }, [showActivity]);
+
+            const activityLayout = useMemo(() => {
+                const totalWeeks = activityWeeks.weeks.length;
+                const daysPerWeek = 7;
+                const { width, height } = activitySize;
+                if (!width || !height) return { bands: 1, weeksPerBand: totalWeeks, cellSize: 5 };
+
+                const availW = Math.max(width - ACTIVITY_DAY_LABEL_W - ACTIVITY_GAP, 20);
+                const availH = Math.max(height, 20);
+
+                let best = { bands: 1, weeksPerBand: totalWeeks, cellSize: 0 };
+                for (let bands = 1; bands <= 8; bands++) {
+                    const weeksPerBand = Math.ceil(totalWeeks / bands);
+                    const cellFromWidth = (availW - ACTIVITY_GAP * (weeksPerBand - 1)) / weeksPerBand;
+                    const totalRows = bands * daysPerWeek;
+                    const cellFromHeight = (availH - ACTIVITY_GAP * (totalRows - 1) - ACTIVITY_BAND_GAP * (bands - 1) - ACTIVITY_MONTH_LABEL_H * bands) / totalRows;
+                    const cellSize = Math.min(cellFromWidth, cellFromHeight);
+                    if (cellSize > best.cellSize) best = { bands, weeksPerBand, cellSize };
+                }
+                best.cellSize = Math.max(2, Math.floor(best.cellSize));
+                return best;
+            }, [activitySize, activityWeeks.weeks.length]);
+
+            const activityBands = useMemo(() => {
+                const { weeksPerBand } = activityLayout;
+                const chunks = [];
+                for (let i = 0; i < activityWeeks.weeks.length; i += weeksPerBand) {
+                    chunks.push(activityWeeks.weeks.slice(i, i + weeksPerBand));
+                }
+                return chunks;
+            }, [activityLayout, activityWeeks.weeks]);
+
+            const activityMonthLabel = (week, prevWeek) => {
+                const firstDay = week.find(d => d);
+                if (!firstDay) return '';
+                const prevFirstDay = prevWeek ? prevWeek.find(d => d) : null;
+                if (!prevFirstDay || prevFirstDay.month !== firstDay.month) {
+                    return new Date(firstDay.date).toLocaleString('en-US', { month: 'short' });
+                }
+                return '';
             };
 
             if (!isDataLoaded) {
@@ -1413,36 +1466,39 @@
                             <div className="flex-1 flex flex-col p-4 pb-safe overflow-hidden">
                                 <p className="text-[11px] mb-3 flex-shrink-0" style={{ color: activeTheme.border }}>{activityWeeks.totalCompleted} quests completed in the last year</p>
 
-                                <div className="flex-1 flex flex-col justify-center min-h-0">
-                                    <div className="flex gap-1.5">
-                                        <div className="flex-shrink-0 flex flex-col justify-between" style={{ width: '18px', paddingTop: '14px' }}>
-                                            {['', 'Mon', '', 'Wed', '', 'Fri', ''].map((label, i) => (
-                                                <div key={i} className="text-[7px] opacity-60" style={{ color: activeTheme.border }}>{label}</div>
-                                            ))}
-                                        </div>
-
-                                        <div className="flex-1 min-w-0">
-                                            <div className="grid mb-1" style={{ gridTemplateColumns: `repeat(${activityWeeks.weeks.length}, minmax(0, 1fr))`, gap: '2px' }}>
-                                                {activityWeeks.monthLabels.map((label, i) => (
-                                                    <div key={i} className="text-[7px] opacity-60 truncate" style={{ color: activeTheme.border }}>{label || ''}</div>
+                                <div ref={activityContainerRef} className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden" style={{ gap: `${ACTIVITY_BAND_GAP}px` }}>
+                                    {activityBands.map((bandWeeks, bandIndex) => (
+                                        <div key={bandIndex} className="flex flex-shrink-0" style={{ gap: `${ACTIVITY_GAP + 1}px` }}>
+                                            <div className="flex-shrink-0 flex flex-col justify-between" style={{ width: `${ACTIVITY_DAY_LABEL_W}px`, paddingTop: `${ACTIVITY_MONTH_LABEL_H}px` }}>
+                                                {['', 'Mon', '', 'Wed', '', 'Fri', ''].map((label, i) => (
+                                                    <div key={i} className="text-[6px] opacity-60 leading-none" style={{ height: `${activityLayout.cellSize}px`, color: activeTheme.border }}>{label}</div>
                                                 ))}
                                             </div>
-                                            <div className="grid" style={{ gridTemplateColumns: `repeat(${activityWeeks.weeks.length}, minmax(0, 1fr))`, gap: '2px' }}>
-                                                {activityWeeks.weeks.map((week, wi) => (
-                                                    <div key={wi} className="flex flex-col" style={{ gap: '2px' }}>
-                                                        {week.map((day, di) => (
-                                                            <div
-                                                                key={di}
-                                                                title={day ? `${day.date}: ${day.count} completed` : ''}
-                                                                className="w-full aspect-square rounded-sm"
-                                                                style={day ? activityIntensityStyle(day.count) : { backgroundColor: 'transparent' }}
-                                                            ></div>
-                                                        ))}
-                                                    </div>
-                                                ))}
+                                            <div>
+                                                <div className="flex" style={{ gap: `${ACTIVITY_GAP}px`, height: `${ACTIVITY_MONTH_LABEL_H}px` }}>
+                                                    {bandWeeks.map((week, wi) => (
+                                                        <div key={wi} className="text-[6px] opacity-60 truncate leading-none" style={{ width: `${activityLayout.cellSize}px`, color: activeTheme.border }}>
+                                                            {activityMonthLabel(week, wi > 0 ? bandWeeks[wi - 1] : null)}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="flex" style={{ gap: `${ACTIVITY_GAP}px` }}>
+                                                    {bandWeeks.map((week, wi) => (
+                                                        <div key={wi} className="flex flex-col" style={{ gap: `${ACTIVITY_GAP}px` }}>
+                                                            {week.map((day, di) => (
+                                                                <div
+                                                                    key={di}
+                                                                    title={day ? `${day.date}: ${day.count} completed` : ''}
+                                                                    className="rounded-sm"
+                                                                    style={{ width: `${activityLayout.cellSize}px`, height: `${activityLayout.cellSize}px`, ...(day ? activityIntensityStyle(day.count) : { backgroundColor: 'transparent' }) }}
+                                                                ></div>
+                                                            ))}
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    ))}
                                 </div>
 
                                 <div className="flex items-center justify-end gap-1 mt-3 text-[8px] opacity-70 flex-shrink-0" style={{ color: activeTheme.border }}>
