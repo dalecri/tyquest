@@ -451,18 +451,19 @@
             const [editingTaskId, setEditingTaskId] = useState(null);
             const [editForm, setEditForm] = useState(null); // { text, dueDate, subtasks, boardId, recurrenceType, customValue, customUnit, isBoss }
             const [showSubtasksInput, setShowSubtasksInput] = useState(false);
-            const [questDateChoice, setQuestDateChoice] = useState('today'); // 'today' | 'tomorrow' | 'custom'
-            const [questDateValue, setQuestDateValue] = useState(getTodayStr());
+            const [questDateChoice, setQuestDateChoice] = useState(null); // null | 'today' | 'tomorrow' | 'custom'
+            const [questDateValue, setQuestDateValue] = useState(''); // empty means no deadline
             const [questRecurrenceType, setQuestRecurrenceType] = useState(null); // null | 'daily' | 'weekly' | 'custom'
             const [questCustomValue, setQuestCustomValue] = useState(2);
             const [questCustomUnit, setQuestCustomUnit] = useState('days'); // 'days' | 'weeks'
             const [questIsBoss, setQuestIsBoss] = useState(false);
 
-            // Reset the quick-pick date + recurrence choice each time the New Quest form opens
+            // Reset the quick-pick date + recurrence choice each time the New Quest form opens.
+            // No date is the default — a deadline should be something you choose to add, not something every quest is stuck with.
             useEffect(() => {
                 if (isAddingQuest) {
-                    setQuestDateChoice('today');
-                    setQuestDateValue(getTodayStr());
+                    setQuestDateChoice(null);
+                    setQuestDateValue('');
                     setQuestRecurrenceType(null);
                     setQuestCustomValue(2);
                     setQuestCustomUnit('days');
@@ -723,7 +724,7 @@
                     text,
                     status: 'todo',
                     boardId: boardId === 'all' ? 'general' : boardId,
-                    dueDate: date,
+                    dueDate: date || null,
                     subtasks: subtasksArr || [],
                     recurrence: recurrence || null,
                     isBoss: !!isBoss,
@@ -743,7 +744,7 @@
                 setEditingTaskId(task.id);
                 setEditForm({
                     text: task.text,
-                    dueDate: task.dueDate || getTodayStr(),
+                    dueDate: task.dueDate || '',
                     subtasks: (task.subtasks || []).map(s => ({ ...s })),
                     boardId: task.boardId === 'general' ? 'all' : task.boardId,
                     recurrenceType: task.recurrence ? task.recurrence.type : null,
@@ -769,7 +770,7 @@
                 setTasks(prev => prev.map(t => t.id === editingTaskId ? {
                     ...t,
                     text,
-                    dueDate: editForm.dueDate,
+                    dueDate: editForm.dueDate || null,
                     subtasks: editForm.subtasks.filter(s => s.text && s.text.trim()).map(s => ({ ...s, text: s.text.trim() })),
                     boardId: resolvedBoardId,
                     recurrence,
@@ -1908,7 +1909,15 @@
                                         </div>
                                     )}
                                     
+                                    <p className="text-[8px] mb-2 opacity-70">DUE DATE (OPTIONAL)</p>
                                     <div className="flex gap-2 mb-4">
+                                        <button 
+                                            type="button" 
+                                            onClick={() => { setQuestDateChoice(null); setQuestDateValue(''); }} 
+                                            className={`flex-1 pixel-box-sm py-2 text-[10px] active:scale-95 ${questDateChoice === null ? 'bg-yellow-400 text-black' : 'bg-gray-200 text-black'}`}
+                                        >
+                                            NO DATE
+                                        </button>
                                         <button 
                                             type="button" 
                                             onClick={() => { setQuestDateChoice('today'); setQuestDateValue(getTodayStr()); }} 
@@ -1928,7 +1937,7 @@
                                         <input 
                                             type="date" name="date" 
                                             value={questDateValue} 
-                                            onChange={(e) => { setQuestDateValue(e.target.value); setQuestDateChoice('custom'); }} 
+                                            onChange={(e) => { setQuestDateValue(e.target.value); setQuestDateChoice(e.target.value ? 'custom' : null); }} 
                                             className="w-full pixel-box-sm p-3 text-[10px] bg-white text-black block" 
                                         />
                                     </div>
@@ -2037,7 +2046,30 @@
                                 </div>
 
                                 <div className="w-full mb-4">
-                                    <p className="text-[8px] mb-1 opacity-70">DUE DATE</p>
+                                    <p className="text-[8px] mb-2 opacity-70">DUE DATE (OPTIONAL)</p>
+                                    <div className="flex gap-2 mb-2">
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setEditForm({ ...editForm, dueDate: '' })} 
+                                            className={`flex-1 pixel-box-sm py-2 text-[10px] active:scale-95 ${!editForm.dueDate ? 'bg-yellow-400 text-black' : 'bg-gray-200 text-black'}`}
+                                        >
+                                            NO DATE
+                                        </button>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setEditForm({ ...editForm, dueDate: getTodayStr() })} 
+                                            className={`flex-1 pixel-box-sm py-2 text-[10px] active:scale-95 ${editForm.dueDate === getTodayStr() ? 'bg-yellow-400 text-black' : 'bg-gray-200 text-black'}`}
+                                        >
+                                            TODAY
+                                        </button>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => setEditForm({ ...editForm, dueDate: getTomorrowStr() })} 
+                                            className={`flex-1 pixel-box-sm py-2 text-[10px] active:scale-95 ${editForm.dueDate === getTomorrowStr() ? 'bg-yellow-400 text-black' : 'bg-gray-200 text-black'}`}
+                                        >
+                                            TMRW
+                                        </button>
+                                    </div>
                                     <input
                                         type="date"
                                         value={editForm.dueDate}
@@ -2286,9 +2318,11 @@
                                 )}
                                 
                                 <div className="flex flex-wrap gap-2 items-center">
-                                    <span className="bg-yellow-200 text-black px-1.5 py-0.5 pixel-box-sm text-[8px]">
-                                        +{calculateTaskReward(task).xp}XP +{calculateTaskReward(task).gold}G
-                                    </span>
+                                    {isDone && (
+                                        <span className="bg-yellow-200 text-black px-1.5 py-0.5 pixel-box-sm text-[8px]">
+                                            +{calculateTaskReward(task).xp}XP +{calculateTaskReward(task).gold}G
+                                        </span>
+                                    )}
 
                                     {task.isBoss && (
                                         <span className="px-1.5 py-0.5 pixel-box-sm text-[8px] bg-red-500 text-white">
@@ -2303,7 +2337,7 @@
                                     )}
 
                                     {task.dueDate && !isDone && (
-                                        <span className={`px-1.5 py-0.5 pixel-box-sm text-[8px] flex items-center gap-1 ${isOverdue ? 'bg-red-500 text-white animate-pulse' : 'bg-white text-black'}`}>
+                                        <span className={`px-1.5 py-0.5 pixel-box-sm text-[8px] flex items-center gap-1 ${isOverdue ? 'bg-amber-200 text-black' : 'bg-white text-black'}`}>
                                             📅 {task.dueDate === getTodayStr() ? 'TODAY' : task.dueDate === getTomorrowStr() ? 'TMRW' : task.dueDate}
                                         </span>
                                     )}
