@@ -430,7 +430,7 @@
             const [nameDraft, setNameDraft] = useState('');
             
             const [themeKey, setThemeKey] = useState('snes16bit');
-            const [unlockedThemes, setUnlockedThemes] = useState(Object.keys(RETRO_THEMES)); // TESTING: all themes unlocked — change back to ['snes16bit'] before shipping to Tyler
+            const [unlockedThemes, setUnlockedThemes] = useState(['snes16bit']);
 
             const [isNavVisible, setIsNavVisible] = useState(true);
             const [showStatsModal, setShowStatsModal] = useState(false);
@@ -1399,7 +1399,7 @@
 
                         {activeTab === 'archive' && (
                             <div className="flex-1 overflow-x-auto snap-x snap-mandatory hide-scrollbar p-4 flex gap-4 items-start h-full pb-8">
-                                <div className="w-[100%] max-w-[500px] h-full mx-auto flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden" style={{ backgroundColor: activeTheme.windowBg }}>
+                                <div className="w-[100%] max-w-[500px] md:max-w-[720px] lg:max-w-[960px] h-full mx-auto flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden" style={{ backgroundColor: activeTheme.windowBg }}>
                                     
                                     <div className="p-3 border-b-4 sticky top-0 z-10 backdrop-blur-sm bg-white/50" style={{ borderColor: activeTheme.border }}>
                                         <form onSubmit={(e) => {
@@ -1420,9 +1420,9 @@
                                         </form>
                                     </div>
                                     
-                                    <div className="p-4 overflow-y-auto hide-scrollbar flex-1 pb-safe flex flex-col gap-2">
+                                    <div className="p-4 overflow-y-auto hide-scrollbar flex-1 pb-safe grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 content-start">
                                         {filteredLibItems.length === 0 && (
-                                            <div className="text-center opacity-50 text-[10px] py-8 text-black">
+                                            <div className="col-span-full text-center opacity-50 text-[10px] py-8 text-black">
                                                 NO ITEMS SAVED
                                             </div>
                                         )}
@@ -1513,7 +1513,7 @@
                                     }
                                 `}</style>
 
-                                <div className="max-w-[500px] mx-auto">
+                                <div className="max-w-[500px] md:max-w-[720px] lg:max-w-[960px] mx-auto">
                                     {/* Signboard header */}
                                     <div className="relative mb-6 pixel-box overflow-hidden" style={{ backgroundColor: activeTheme.hudBg, borderColor: activeTheme.border }}>
                                         <div className="absolute inset-0 opacity-25 pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(90deg, rgba(0,0,0,0.2) 0px, rgba(0,0,0,0.2) 2px, transparent 2px, transparent 16px)' }}></div>
@@ -1539,7 +1539,7 @@
                                     {/* Achievements Section */}
                                     <div className="pixel-box-sm p-4 mb-6" style={{ backgroundColor: activeTheme.windowBg }}>
                                         <h3 className="text-[12px] mb-4" style={{ color: activeTheme.primary }}>🏆 TROPHY CASE</h3>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                             {ACHIEVEMENTS.map(a => {
                                                 const unlocked = a.check(achievementStats);
                                                 return (
@@ -1563,7 +1563,7 @@
                                     {/* Themes Section */}
                                     <div className="pixel-box-sm p-4 mb-6" style={{ backgroundColor: activeTheme.windowBg }}>
                                         <h3 className="text-[12px] mb-4" style={{ color: activeTheme.primary }}>🎨 WARDROBE</h3>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                             {Object.values(RETRO_THEMES).map(t => {
                                                 const isUnlocked = unlockedThemes.includes(t.id);
                                                 const isActive = themeKey === t.id;
