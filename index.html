@@ -1487,11 +1487,14 @@
                                         <div className="text-xs">{Number.isNaN(gold) ? 0 : gold}</div>
                                         <div className="text-[7px] opacity-70 mt-1">GOLD</div>
                                     </div>
-                                    <div className="pixel-box-sm p-2 bg-black/5 text-black">
+                                    <button 
+                                        onClick={() => { setShowStatsModal(false); openActivity(); }}
+                                        className="pixel-box-sm p-2 bg-black/5 text-black active:scale-95"
+                                    >
                                         <div className="text-lg text-blue-500 mb-1">⚔️</div>
                                         <div className="text-xs">{tasks.filter(t => t.status === 'done').length}</div>
                                         <div className="text-[7px] opacity-70 mt-1">DONE</div>
-                                    </div>
+                                    </button>
                                     <div className="pixel-box-sm p-2 bg-yellow-100 text-black border-yellow-500">
                                         <div className="text-lg mb-1">📅</div>
                                         <div className="text-xs font-bold text-yellow-800">{tasks.filter(t => t.dueDate === getTodayStr() && t.status !== 'done').length}</div>
