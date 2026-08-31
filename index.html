@@ -383,12 +383,12 @@
             const triggerConfetti = () => {
                 if (window.confetti) {
                     window.confetti({
-                        particleCount: 30,
-                        spread: 60,
+                        particleCount: 40,
+                        spread: 70,
                         origin: { y: 0.1 },
-                        colors: [activeTheme.primary, activeTheme.hudText, '#FFD700', '#ffffff'],
+                        colors: [activeTheme.primary, '#FFD700', '#ffffff', '#ff4757'],
                         shapes: ['square'],
-                        scalar: 0.8
+                        scalar: 0.9
                     });
                 }
             };
@@ -664,16 +664,16 @@
                         )}
 
                         {/* Persistent Header Secondary Bar + Toggle */}
-                        <div className={`flex justify-between items-stretch bg-black/10 ${!isNavVisible ? 'pt-safe' : ''}`}>
+                        <div className={`flex justify-between items-center bg-black/10`}>
                             
                             {!isNavVisible && (
                                 <button 
                                     onClick={() => { sound.playBlip(); setShowStatsModal(true); }} 
-                                    className="pl-3 pr-2 py-1 active:scale-95 flex items-center justify-center border-r-2"
+                                    className="px-2 py-1 active:scale-95 flex items-center gap-2 border-r-4 flex-shrink-0"
                                     style={{ borderColor: activeTheme.border }}
                                     title="View Profile"
                                 >
-                                    <div className="scale-75"><HeroAvatar /></div>
+                                    <div className="flex-shrink-0"><HeroAvatar /></div>
                                 </button>
                             )}
 
@@ -750,7 +750,7 @@
                             {/* Nav Toggle Button */}
                             <button 
                                 onClick={() => { sound.playBlip(); setIsNavVisible(!isNavVisible); }}
-                                className="px-4 active:scale-95 border-l-4 flex items-center justify-center flex-shrink-0"
+                                className="px-4 py-2.5 active:scale-95 border-l-4 flex items-center justify-center flex-shrink-0"
                                 style={{ borderColor: activeTheme.border, color: activeTheme.hudText }}
                             >
                                 {isNavVisible ? <IconChevronUp /> : <IconChevronDown />}
