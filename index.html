@@ -26,6 +26,15 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        /* Enforce strict full-screen fixed layout to prevent page-level scroll */
+        html, body, #root {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
@@ -119,13 +128,13 @@
             },
             cyberArcade: {
                 id: 'cyberArcade', name: 'Neon Arcade', isDark: true, cost: 100,
-                bg: '#140c24', windowBg: '#21163a', hudBg: '#090414', hudText: '#00f0ff',
-                border: '#ff007f', primary: '#00f0ff', colTodo: '#e02875', colDoing: '#8c25e2', colDone: '#00b894', tagBg: '#2f1f52'
+                bg: '#05020a', windowBg: '#130b29', hudBg: '#0f051c', hudText: '#00f0ff',
+                border: '#f000ff', primary: '#00f0ff', colTodo: '#ff0055', colDoing: '#9d00ff', colDone: '#00ffaa', tagBg: '#2a1758'
             },
             cozyCafe: {
-                id: 'cozyCafe', name: 'Cozy Cafe', isDark: false, cost: 250,
-                bg: '#d7bfa6', windowBg: '#f2e8dc', hudBg: '#4a3b32', hudText: '#f2e8dc',
-                border: '#332620', primary: '#8c6b5d', colTodo: '#c49a7c', colDoing: '#a87b5d', colDone: '#825b42', tagBg: '#e3d2c1'
+                id: 'cozyCafe', name: 'Cantina', isDark: false, cost: 250,
+                bg: '#e6ccb8', windowBg: '#f5e6d3', hudBg: '#5c3a21', hudText: '#f5e6d3',
+                border: '#4a2c17', primary: '#c45a33', colTodo: '#d48a6a', colDoing: '#bd7246', colDone: '#8f5331', tagBg: '#d9c2ad'
             }
         };
 
@@ -255,7 +264,7 @@
                 { id: 't1', text: 'Slay the laundry dragon', status: 'todo', boardId: 'house', dueDate: getTodayStr(), subtasks: [{id: 's1', text: 'Wash clothes', done: true}, {id: 's2', text: 'Fold and put away', done: false}] },
                 { id: 't2', text: 'Visit Potion Master (Dentist)', status: 'todo', boardId: 'general', dueDate: getTomorrowStr(), subtasks: [] },
                 { id: 't3', text: 'Cook HP Ration Meals for week', status: 'doing', boardId: 'house', dueDate: getTodayStr(), subtasks: [] },
-                { id: 't4', text: 'Pay the troll toll (Electric bill)', status: 'done', boardId: 'general', dueDate: getTodayStr(), subtasks: [] }
+                { id: 't4', text: 'Pay the troll toll (Electric bill)', status: 'done', boardId: 'general', dueDate: getTodayStr(), completedAt: getTodayStr(), subtasks: [] }
             ];
 
             const initialBoards = [
@@ -347,7 +356,12 @@
                 else if (task.status === 'doing') nextStatus = 'done';
                 else if (task.status === 'done') nextStatus = 'todo';
 
-                setTasks(tasks.map(t => t.id === task.id ? { ...t, status: nextStatus } : t));
+                setTasks(tasks.map(t => {
+                    if (t.id === task.id) {
+                        return { ...t, status: nextStatus, completedAt: nextStatus === 'done' ? getTodayStr() : t.completedAt };
+                    }
+                    return t;
+                }));
 
                 if (nextStatus === 'done') {
                     sound.playCoin();
@@ -364,7 +378,7 @@
 
             const handleDefeatBoss = (taskId) => {
                 // Instantly complete task from any state when attacked in Boss Mode
-                setTasks(tasks.map(t => t.id === taskId ? { ...t, status: 'done' } : t));
+                setTasks(tasks.map(t => t.id === taskId ? { ...t, status: 'done', completedAt: getTodayStr() } : t));
                 sound.playCoin();
                 setXp(prev => prev + 50);
                 setGold(prev => prev + 10);
@@ -939,6 +953,11 @@
                                     {task.dueDate && !isDone && (
                                         <span className={`px-1.5 py-0.5 pixel-box-sm text-[8px] flex items-center gap-1 ${isOverdue ? 'bg-red-500 text-white animate-pulse' : 'bg-white text-black'}`}>
                                             📅 {task.dueDate === getTodayStr() ? 'TODAY' : task.dueDate === getTomorrowStr() ? 'TMRW' : task.dueDate}
+                                        </span>
+                                    )}
+                                    {isDone && task.completedAt && (
+                                        <span className="px-1.5 py-0.5 pixel-box-sm text-[8px] flex items-center gap-1 bg-black/10 text-inherit opacity-75">
+                                            ✓ {task.completedAt}
                                         </span>
                                     )}
                                     {activeBoardId === 'all' && task.boardId !== 'general' && (
