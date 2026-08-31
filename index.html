@@ -465,7 +465,6 @@
             // Custom pointer-based drag state (replaces native HTML5 DnD, which is unreliable on touch)
             const [dragState, setDragState] = useState(null); // { taskId, x, y, offsetX, offsetY, width, hoverColId }
             const dragCandidateRef = useRef(null); // pending drag before the hold threshold clears
-            const activityScrollRef = useRef(null);
             const dragTimerRef = useRef(null);
 
             // Cross-device sync (JSONBin.io) state
@@ -964,12 +963,6 @@
                 return { backgroundColor: activeTheme.primary, opacity: opacityByLevel[Math.min(count, 4)] };
             };
 
-            useEffect(() => {
-                if (showActivity && activityScrollRef.current) {
-                    activityScrollRef.current.scrollLeft = activityScrollRef.current.scrollWidth;
-                }
-            }, [showActivity]);
-
             if (!isDataLoaded) {
                 return (
                     <div className="min-h-screen flex items-center justify-center font-arcade text-xl" style={{ backgroundColor: activeTheme.bg, color: activeTheme.border }}>
@@ -1020,11 +1013,6 @@
                                         </button>
                                         <button onClick={() => { sound.playBlip(); setActiveTab('archive'); }} className={`p-1 active:scale-95 transition-colors`} style={{ color: activeTheme.hudText }}>
                                             <IconArchive active={activeTab === 'archive'} />
-                                        </button>
-                                        <button onClick={() => { sound.playBlip(); setShowStatsModal(true); }} className="p-1 active:scale-95 leading-none" title="Cross-device sync">
-                                            <span className="text-lg">
-                                                {!syncConfig ? '🔌' : syncStatus === 'syncing' ? '🔄' : syncStatus === 'error' ? '⚠️' : '☁️'}
-                                            </span>
                                         </button>
                                     </div>
                                 </div>
@@ -1141,13 +1129,17 @@
                                             className={`w-[88vw] max-w-[360px] h-full flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden !rounded-t-[4px] !rounded-b-[40px] transition-transform ${isDropTarget ? 'scale-[1.02] ring-4 ring-yellow-300' : ''}`} 
                                             style={{ backgroundColor: colColor }}
                                         >
-                                            <div className="p-3 border-b-4 border-black/50 bg-black/20 flex items-center justify-between text-white text-xs sticky top-0 z-10 backdrop-blur-sm">
+                                            <div 
+                                                className={`p-3 border-b-4 border-black/50 bg-black/20 flex items-center justify-between text-white text-xs sticky top-0 z-10 backdrop-blur-sm ${colId === 'done' ? 'active:scale-[0.98] cursor-pointer' : ''}`}
+                                                onClick={() => { if (colId === 'done') openActivity(); }}
+                                            >
                                                 <span className="truncate pr-2">{colLabel} <span className="opacity-50 text-[10px]">({colTasks.length})</span></span>
                                                 {colId === 'todo' && (
                                                     <button onClick={() => { sound.playBlip(); setIsAddingQuest(true); }} className="bg-yellow-400 text-black px-2 py-1 pixel-box-sm active:scale-90 flex-shrink-0">
                                                         + ADD
                                                     </button>
                                                 )}
+                                                {colId === 'done' && <span className="text-[9px] opacity-70 flex-shrink-0">📊</span>}
                                             </div>
                                             <div className="p-3 overflow-y-auto hide-scrollbar flex-1 flex flex-col gap-3 pb-safe">
                                                 {colTasks.length === 0 && (
@@ -1195,7 +1187,12 @@
 
                                         {filteredTasks.filter(t => t.status === 'done').length > 0 && (
                                             <div className="mt-8 opacity-60">
-                                                <h3 className="text-[10px] mb-2 uppercase text-center text-black">VICTORY (DONE)</h3>
+                                                <h3 
+                                                    className="text-[10px] mb-2 uppercase text-center text-black active:scale-95 cursor-pointer"
+                                                    onClick={openActivity}
+                                                >
+                                                    VICTORY (DONE) 📊
+                                                </h3>
                                                 <div className="flex flex-col gap-2">
                                                     {filteredTasks.filter(t => t.status === 'done').map(t => <TaskCard key={t.id} task={t} compact={true} />)}
                                                 </div>
@@ -1403,49 +1400,47 @@
                                 <button onClick={closeActivity} className="pixel-box-sm px-3 py-1.5 text-[10px] bg-red-500 text-white active:scale-95">CLOSE ▼</button>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto hide-scrollbar p-4 pb-safe">
-                                <div className="max-w-[600px] mx-auto">
-                                    <div className="pixel-box-sm p-4" style={{ backgroundColor: activeTheme.windowBg }}>
-                                        <p className="text-[11px] mb-4 text-black">{activityWeeks.totalCompleted} quests completed in the last year</p>
+                            <div className="flex-1 flex flex-col p-4 pb-safe overflow-hidden">
+                                <p className="text-[11px] mb-3 flex-shrink-0" style={{ color: activeTheme.border }}>{activityWeeks.totalCompleted} quests completed in the last year</p>
 
-                                        <div ref={activityScrollRef} className="overflow-x-auto hide-scrollbar">
-                                            <div className="inline-flex" style={{ minWidth: 'max-content' }}>
-                                                <div className="flex flex-col mr-1" style={{ gap: '3px', marginTop: '18px' }}>
-                                                    {['', 'Mon', '', 'Wed', '', 'Fri', ''].map((label, i) => (
-                                                        <div key={i} className="text-[7px] text-black opacity-60 flex items-center" style={{ height: '11px' }}>
-                                                            {label}
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                <div className="flex-1 flex flex-col justify-center min-h-0">
+                                    <div className="flex gap-1.5">
+                                        <div className="flex-shrink-0 flex flex-col justify-between" style={{ width: '18px', paddingTop: '14px' }}>
+                                            {['', 'Mon', '', 'Wed', '', 'Fri', ''].map((label, i) => (
+                                                <div key={i} className="text-[7px] opacity-60" style={{ color: activeTheme.border }}>{label}</div>
+                                            ))}
+                                        </div>
 
-                                                <div className="flex" style={{ gap: '3px' }}>
-                                                    {activityWeeks.weeks.map((week, wi) => (
-                                                        <div key={wi} className="flex flex-col" style={{ gap: '3px' }}>
-                                                            <div className="text-[7px] text-black opacity-60 whitespace-nowrap" style={{ height: '14px', width: '11px' }}>
-                                                                {activityWeeks.monthLabels[wi] || ''}
-                                                            </div>
-                                                            {week.map((day, di) => (
-                                                                <div
-                                                                    key={di}
-                                                                    title={day ? `${day.date}: ${day.count} completed` : ''}
-                                                                    className="rounded-sm"
-                                                                    style={{ width: '11px', height: '11px', ...(day ? activityIntensityStyle(day.count) : { backgroundColor: 'transparent' }) }}
-                                                                ></div>
-                                                            ))}
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="grid mb-1" style={{ gridTemplateColumns: `repeat(${activityWeeks.weeks.length}, minmax(0, 1fr))`, gap: '2px' }}>
+                                                {activityWeeks.monthLabels.map((label, i) => (
+                                                    <div key={i} className="text-[7px] opacity-60 truncate" style={{ color: activeTheme.border }}>{label || ''}</div>
+                                                ))}
+                                            </div>
+                                            <div className="grid" style={{ gridTemplateColumns: `repeat(${activityWeeks.weeks.length}, minmax(0, 1fr))`, gap: '2px' }}>
+                                                {activityWeeks.weeks.map((week, wi) => (
+                                                    <div key={wi} className="flex flex-col" style={{ gap: '2px' }}>
+                                                        {week.map((day, di) => (
+                                                            <div
+                                                                key={di}
+                                                                title={day ? `${day.date}: ${day.count} completed` : ''}
+                                                                className="w-full aspect-square rounded-sm"
+                                                                style={day ? activityIntensityStyle(day.count) : { backgroundColor: 'transparent' }}
+                                                            ></div>
+                                                        ))}
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
-
-                                        <div className="flex items-center justify-end gap-1 mt-4 text-[8px] text-black opacity-70">
-                                            <span>Less</span>
-                                            {[0, 1, 2, 3, 4].map(lvl => (
-                                                <div key={lvl} className="rounded-sm" style={{ width: '10px', height: '10px', ...activityIntensityStyle(lvl) }}></div>
-                                            ))}
-                                            <span>More</span>
-                                        </div>
                                     </div>
+                                </div>
+
+                                <div className="flex items-center justify-end gap-1 mt-3 text-[8px] opacity-70 flex-shrink-0" style={{ color: activeTheme.border }}>
+                                    <span>Less</span>
+                                    {[0, 1, 2, 3, 4].map(lvl => (
+                                        <div key={lvl} className="rounded-sm" style={{ width: '9px', height: '9px', ...activityIntensityStyle(lvl) }}></div>
+                                    ))}
+                                    <span>More</span>
                                 </div>
                             </div>
                         </div>
@@ -1495,7 +1490,7 @@
                                 </div>
 
                                 {/* --- QUICK ACTIONS --- */}
-                                <div className="grid grid-cols-3 gap-2 mb-6">
+                                <div className="grid grid-cols-2 gap-2 mb-6">
                                     <button
                                         onClick={() => { setShowStatsModal(false); openTavern(); }}
                                         className="pixel-box-sm p-2 flex flex-col items-center gap-1 bg-black/5 text-black active:scale-95"
@@ -1510,13 +1505,6 @@
                                     >
                                         <span className="w-5 h-5"><IconBoss /></span>
                                         <span className="text-[7px] leading-tight text-center">BOSS FIGHT</span>
-                                    </button>
-                                    <button
-                                        onClick={() => { setShowStatsModal(false); openActivity(); }}
-                                        className="pixel-box-sm p-2 flex flex-col items-center gap-1 bg-black/5 text-black active:scale-95"
-                                    >
-                                        <span className="text-lg">📊</span>
-                                        <span className="text-[7px] leading-tight text-center">ACTIVITY</span>
                                     </button>
                                 </div>
 
