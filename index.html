@@ -2240,6 +2240,7 @@
                         
                         <button 
                             onClick={() => handleDeleteTask(task.id)} 
+                            onPointerDown={(e) => e.stopPropagation()}
                             className="absolute top-2 right-2 text-red-500 font-bold px-1.5 py-0.5 pixel-box-sm bg-white/80 active:scale-90 text-[10px]"
                             title="Delete Task"
                         >
@@ -2249,6 +2250,7 @@
                         <div className="flex items-start gap-3 pr-6">
                             <button 
                                 onClick={() => handleToggleTaskStatus(task)}
+                                onPointerDown={(e) => e.stopPropagation()}
                                 disabled={isDone}
                                 className={`w-6 h-6 flex-shrink-0 pixel-box-sm flex items-center justify-center text-xs mt-0.5 ${isDone ? 'bg-black text-white cursor-not-allowed opacity-60' : 'bg-white active:scale-90'}`}
                             >
@@ -2269,6 +2271,7 @@
                                             <div key={sub.id} className="flex items-center gap-2">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handleToggleSubtask(task.id, idx); }}
+                                                    onPointerDown={(e) => e.stopPropagation()}
                                                     disabled={isDone}
                                                     className={`w-3.5 h-3.5 flex-shrink-0 pixel-box-sm flex items-center justify-center ${sub.done ? 'bg-green-500 text-white' : 'bg-white'} ${isDone ? 'cursor-not-allowed opacity-70' : ''}`}
                                                 >
@@ -2326,6 +2329,7 @@
                                                 if (newBoardId !== 'general') setActiveBoardId(newBoardId);
                                             }}
                                             onClick={(e) => e.stopPropagation()}
+                                            onPointerDown={(e) => e.stopPropagation()}
                                             className="px-1 py-0.5 pixel-box-sm text-[8px] bg-blue-200 text-black"
                                             title="Move to board"
                                         >
@@ -2342,7 +2346,7 @@
                         {/* Reroll Action */}
                         {isOverdue && !isDone && (
                             <div className="mt-3 pt-3 border-t-2 border-black/10 flex justify-start items-center">
-                                <button onClick={() => handleRerollTask(task.id)} className="bg-purple-500 text-white px-2 py-1 pixel-box-sm text-[8px] active:scale-95 flex items-center gap-1">
+                                <button onClick={() => handleRerollTask(task.id)} onPointerDown={(e) => e.stopPropagation()} className="bg-purple-500 text-white px-2 py-1 pixel-box-sm text-[8px] active:scale-95 flex items-center gap-1">
                                     🎲 REROLL (5G)
                                 </button>
                             </div>
