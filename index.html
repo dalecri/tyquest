@@ -122,18 +122,44 @@
                 id: 'mexicanCafe', name: 'Mexican Cafe', isDark: false, cost: 150,
                 bg: '#dfb182', windowBg: '#f2e3cb', hudBg: '#592c1a', hudText: '#f2e3cb',
                 border: '#36180c', primary: '#b8522b', colTodo: '#d97d43', colDoing: '#c26636', colDone: '#8f4f2c', tagBg: '#e6ccb2'
+            },
+            pixelForest: {
+                id: 'pixelForest', name: 'Pixel Forest', isDark: false, cost: 200,
+                bg: '#c8dfc0', windowBg: '#eef5e7', hudBg: '#1f3d2b', hudText: '#d9f2c4',
+                border: '#14261a', primary: '#3f7d43', colTodo: '#7fae6b', colDoing: '#5c9e78', colDone: '#4a8562', tagBg: '#d7e8c9'
+            },
+            arcadeNeon: {
+                id: 'arcadeNeon', name: 'Arcade Neon', isDark: true, cost: 250,
+                bg: '#241b3a', windowBg: '#fdf3ff', hudBg: '#ff2e92', hudText: '#fdf3ff',
+                border: '#160f24', primary: '#7c3aed', colTodo: '#a855f7', colDoing: '#ec4899', colDone: '#6d28d9', tagBg: '#f1d9ff'
+            },
+            desertOutpost: {
+                id: 'desertOutpost', name: 'Desert Outpost', isDark: false, cost: 200,
+                bg: '#e8c988', windowBg: '#fbf0da', hudBg: '#5c3d1e', hudText: '#f5dfb0',
+                border: '#3a2510', primary: '#c1782f', colTodo: '#d9a441', colDoing: '#b96b3a', colDone: '#8a5a2b', tagBg: '#eedcb5'
+            },
+            oceanByte: {
+                id: 'oceanByte', name: 'Ocean Byte', isDark: false, cost: 250,
+                bg: '#a8d4dc', windowBg: '#eaf7f9', hudBg: '#0e3b4d', hudText: '#c9eef5',
+                border: '#082530', primary: '#1c7a91', colTodo: '#3aa0b8', colDoing: '#2c7f99', colDone: '#1f647a', tagBg: '#cdeef2'
+            },
+            midnightDungeon: {
+                id: 'midnightDungeon', name: 'Midnight Dungeon', isDark: true, cost: 350,
+                bg: '#2a2438', windowBg: '#f3eefc', hudBg: '#150f1e', hudText: '#c9b8ec',
+                border: '#0c0812', primary: '#8b5cf6', colTodo: '#6d4a9c', colDoing: '#553880', colDone: '#3d2762', tagBg: '#e4d9f7'
             }
         };
 
-        const SHOP_REWARDS = [
-            { id: 'r1', name: 'Buy a Coffee Treat', cost: 25 },
-            { id: 'r2', name: '20 Min Guilt-Free Doomscroll', cost: 50 },
-            { id: 'r3', name: 'Get Out of a Chore Free', cost: 150 },
-            { id: 'r4', name: "Husband's Back Massage Pass", cost: 200 },
-            { id: 'r5', name: '1 Hour Guilt-Free Gaming', cost: 75 },
-            { id: 'r6', name: 'Pajama Day (Weekend)', cost: 300 },
-            { id: 'r7', name: 'Buy Hobby Supplies ($20 Limit)', cost: 500 },
-            { id: 'r8', name: 'Takeout Dinner of Choice', cost: 400 }
+        // In-game achievements — unlocked automatically based on progress, no gold spent
+        const ACHIEVEMENTS = [
+            { id: 'a1', icon: '🗡️', name: 'First Blood', desc: 'Complete your first quest', check: (s) => s.completedCount >= 1 },
+            { id: 'a2', icon: '📜', name: 'Quest Novice', desc: 'Complete 10 quests', check: (s) => s.completedCount >= 10 },
+            { id: 'a3', icon: '🛡️', name: 'Quest Veteran', desc: 'Complete 50 quests', check: (s) => s.completedCount >= 50 },
+            { id: 'a4', icon: '🐉', name: 'Dragon Slayer', desc: 'Complete 100 quests', check: (s) => s.completedCount >= 100 },
+            { id: 'a5', icon: '⭐', name: 'Rising Hero', desc: 'Reach Level 5', check: (s) => s.level >= 5 },
+            { id: 'a6', icon: '🌟', name: 'Seasoned Hero', desc: 'Reach Level 10', check: (s) => s.level >= 10 },
+            { id: 'a7', icon: '💰', name: 'Gold Hoarder', desc: 'Hold 500 Gold at once', check: (s) => s.gold >= 500 },
+            { id: 'a8', icon: '🎨', name: 'Fashionista', desc: 'Unlock every theme', check: (s) => s.unlockedThemesCount >= s.totalThemesCount }
         ];
 
         const GoldBadge = ({ amount }) => (
@@ -259,6 +285,53 @@
             return d.toISOString().split('T')[0];
         };
 
+        // --- JSONBin.io sync (no email account needed, just an API key + a shared Bin ID) ---
+        const JSONBIN_BASE = 'https://api.jsonbin.io/v3/b';
+        const SYNC_CONFIG_KEY = 'tyquest_sync_config';
+
+        const loadSyncConfig = () => {
+            try {
+                const raw = localStorage.getItem(SYNC_CONFIG_KEY);
+                return raw ? JSON.parse(raw) : null;
+            } catch (e) { return null; }
+        };
+
+        const saveSyncConfig = (config) => {
+            try {
+                if (config) localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(config));
+                else localStorage.removeItem(SYNC_CONFIG_KEY);
+            } catch (e) { /* ignore */ }
+        };
+
+        const jsonbinFetch = async (config) => {
+            const res = await fetch(`${JSONBIN_BASE}/${config.binId}/latest`, {
+                headers: { 'X-Master-Key': config.apiKey }
+            });
+            if (!res.ok) throw new Error('Fetch failed: ' + res.status);
+            const data = await res.json();
+            return data.record;
+        };
+
+        const jsonbinPush = async (config, snapshot) => {
+            const res = await fetch(`${JSONBIN_BASE}/${config.binId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': config.apiKey },
+                body: JSON.stringify(snapshot)
+            });
+            if (!res.ok) throw new Error('Push failed: ' + res.status);
+        };
+
+        const jsonbinCreate = async (apiKey, snapshot) => {
+            const res = await fetch(JSONBIN_BASE, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Master-Key': apiKey, 'X-Bin-Name': 'TyQuest Sync' },
+                body: JSON.stringify(snapshot)
+            });
+            if (!res.ok) throw new Error('Create failed: ' + res.status);
+            const data = await res.json();
+            return data.metadata.id;
+        };
+
         // Seed data — defined once at module scope instead of being rebuilt on every render
         const initialTasks = [
             { id: 't1', text: 'Slay the laundry dragon', status: 'todo', boardId: 'house', dueDate: getTodayStr(), subtasks: [{id: 's1', text: 'Wash clothes', done: true}, {id: 's2', text: 'Fold and put away', done: false}] },
@@ -302,7 +375,7 @@
             const [gold, setGold] = useState(0);
             
             const [themeKey, setThemeKey] = useState('snes16bit');
-            const [unlockedThemes, setUnlockedThemes] = useState(['snes16bit']);
+            const [unlockedThemes, setUnlockedThemes] = useState(Object.keys(RETRO_THEMES)); // TESTING: all themes unlocked — change back to ['snes16bit'] before shipping to Tyler
 
             const [isNavVisible, setIsNavVisible] = useState(true);
             const [showStatsModal, setShowStatsModal] = useState(false);
@@ -322,6 +395,19 @@
             const [dragState, setDragState] = useState(null); // { taskId, x, y, offsetX, offsetY, width, hoverColId }
             const dragCandidateRef = useRef(null); // pending drag before the hold threshold clears
             const dragTimerRef = useRef(null);
+
+            // Cross-device sync (JSONBin.io) state
+            const [syncConfig, setSyncConfig] = useState(null); // { apiKey, binId }
+            const [showSyncModal, setShowSyncModal] = useState(false);
+            const [syncStatus, setSyncStatus] = useState('offline'); // offline | syncing | synced | error
+            const [syncFormKey, setSyncFormKey] = useState('');
+            const [syncFormBinId, setSyncFormBinId] = useState('');
+            const [syncError, setSyncError] = useState('');
+            const [justCreatedBinId, setJustCreatedBinId] = useState(null);
+            const pushTimerRef = useRef(null);
+            const pendingPushRef = useRef(false);
+            const isRemoteApplyRef = useRef(false);
+            const hasSyncedOnceRef = useRef(false);
 
             // Level calculation
             useEffect(() => {
@@ -355,7 +441,94 @@
                     setIsDataLoaded(true);
                 };
                 loadData();
+
+                const cfg = loadSyncConfig();
+                if (cfg) setSyncConfig(cfg);
             }, []);
+
+            const applySnapshotToState = (snap) => {
+                if (!snap) return;
+                if (snap.tasks) setTasks(snap.tasks);
+                if (snap.boards) setBoards(snap.boards);
+                if (snap.libraryCategories) setLibraryCategories(snap.libraryCategories);
+                if (snap.libraryItems) setLibraryItems(snap.libraryItems);
+                if (typeof snap.xp === 'number') setXp(snap.xp);
+                if (typeof snap.gold === 'number') setGold(snap.gold);
+                if (snap.themeKey) setThemeKey(snap.themeKey);
+                if (snap.unlockedThemes) setUnlockedThemes(snap.unlockedThemes);
+            };
+
+            const pullNow = async (cfgOverride) => {
+                const cfg = cfgOverride || syncConfig;
+                if (!cfg || pendingPushRef.current) return;
+                try {
+                    setSyncStatus('syncing');
+                    const snap = await jsonbinFetch(cfg);
+                    isRemoteApplyRef.current = true;
+                    applySnapshotToState(snap);
+                    hasSyncedOnceRef.current = true;
+                    setSyncStatus('synced');
+                } catch (e) {
+                    setSyncStatus('error');
+                }
+            };
+
+            // Pull once we have a config (loaded from storage or just connected), then again whenever
+            // the app is brought back to the foreground — deliberately NOT constant polling, to stay
+            // well inside JSONBin's free-tier request quota.
+            useEffect(() => {
+                if (!syncConfig || !isDataLoaded) return;
+                pullNow();
+                const onVisible = () => { if (document.visibilityState === 'visible') pullNow(); };
+                document.addEventListener('visibilitychange', onVisible);
+                return () => document.removeEventListener('visibilitychange', onVisible);
+            }, [syncConfig, isDataLoaded]);
+
+            const connectToBin = async (apiKey, binId) => {
+                setSyncError('');
+                setSyncStatus('syncing');
+                try {
+                    const cfg = { apiKey: apiKey.trim(), binId: binId.trim() };
+                    const snap = await jsonbinFetch(cfg);
+                    isRemoteApplyRef.current = true;
+                    applySnapshotToState(snap);
+                    hasSyncedOnceRef.current = true;
+                    saveSyncConfig(cfg);
+                    setSyncConfig(cfg);
+                    setSyncStatus('synced');
+                    setShowSyncModal(false);
+                } catch (e) {
+                    setSyncError('Could not connect — check the API key and Bin ID.');
+                    setSyncStatus('error');
+                }
+            };
+
+            const createNewBin = async (apiKey) => {
+                setSyncError('');
+                setSyncStatus('syncing');
+                try {
+                    const key = apiKey.trim();
+                    const snapshot = { tasks, boards, libraryCategories, libraryItems, xp, gold, themeKey, unlockedThemes };
+                    const binId = await jsonbinCreate(key, snapshot);
+                    const cfg = { apiKey: key, binId };
+                    hasSyncedOnceRef.current = true;
+                    saveSyncConfig(cfg);
+                    setSyncConfig(cfg);
+                    setSyncStatus('synced');
+                    setJustCreatedBinId(binId);
+                } catch (e) {
+                    setSyncError('Could not create a sync bin — check the API key.');
+                    setSyncStatus('error');
+                }
+            };
+
+            const disconnectSync = () => {
+                saveSyncConfig(null);
+                setSyncConfig(null);
+                setJustCreatedBinId(null);
+                hasSyncedOnceRef.current = false;
+                setSyncStatus('offline');
+            };
 
             // Data Saving
             useEffect(() => {
@@ -368,19 +541,41 @@
                 saveToDB('tq_gold', gold.toString());
                 saveToDB('tq_theme', themeKey);
                 saveToDB('tq_unlocked_themes', unlockedThemes);
-            }, [tasks, boards, libraryCategories, libraryItems, xp, gold, themeKey, unlockedThemes, isDataLoaded]);
+
+                if (!syncConfig || !hasSyncedOnceRef.current) return;
+                if (isRemoteApplyRef.current) { isRemoteApplyRef.current = false; return; }
+
+                pendingPushRef.current = true;
+                clearTimeout(pushTimerRef.current);
+                pushTimerRef.current = setTimeout(async () => {
+                    try {
+                        setSyncStatus('syncing');
+                        await jsonbinPush(syncConfig, { tasks, boards, libraryCategories, libraryItems, xp, gold, themeKey, unlockedThemes });
+                        setSyncStatus('synced');
+                    } catch (e) {
+                        setSyncStatus('error');
+                    } finally {
+                        pendingPushRef.current = false;
+                    }
+                }, 1500);
+            }, [tasks, boards, libraryCategories, libraryItems, xp, gold, themeKey, unlockedThemes, isDataLoaded, syncConfig]);
 
             const activeTheme = RETRO_THEMES[themeKey] || RETRO_THEMES.snes16bit;
 
             const triggerConfetti = () => {
                 if (window.confetti) {
                     window.confetti({
-                        particleCount: 40,
-                        spread: 70,
-                        origin: { y: 0.1 },
-                        colors: [activeTheme.primary, '#FFD700', '#ffffff', '#ff4757'],
+                        particleCount: 16,
+                        spread: 45,
+                        startVelocity: 22,
+                        gravity: 1.3,
+                        ticks: 70,
+                        decay: 0.92,
+                        origin: { y: 0.15 },
+                        colors: [activeTheme.primary, '#FFD700', '#ffffff'],
                         shapes: ['square'],
-                        scalar: 0.9
+                        scalar: 0.7,
+                        disableForReducedMotion: true
                     });
                 }
             };
@@ -560,15 +755,6 @@
                 };
             }, [dragState, tasks]);
 
-            const handleBuyReward = (cost) => {
-                if (gold >= cost) {
-                    setGold(prev => prev - cost);
-                    sound.playCoin();
-                } else {
-                    sound.playError();
-                }
-            };
-
             const handleBuyTheme = (themeId, cost) => {
                 if (gold >= cost) {
                     setGold(prev => prev - cost);
@@ -644,6 +830,14 @@
                 return active.sort((a, b) => new Date(a.dueDate || '2099-01-01') - new Date(b.dueDate || '2099-01-01'))[0];
             }, [tasks]);
 
+            const achievementStats = useMemo(() => ({
+                completedCount: tasks.filter(t => t.status === 'done').length,
+                level,
+                gold,
+                unlockedThemesCount: unlockedThemes.length,
+                totalThemesCount: Object.keys(RETRO_THEMES).length
+            }), [tasks, level, gold, unlockedThemes]);
+
             if (!isDataLoaded) {
                 return (
                     <div className="min-h-screen flex items-center justify-center font-arcade text-xl" style={{ backgroundColor: activeTheme.bg, color: activeTheme.border }}>
@@ -702,6 +896,11 @@
                                         </button>
                                         <button onClick={() => { sound.playBlip(); setActiveTab('shop'); }} className={`p-1 active:scale-95 transition-colors`} style={{ color: activeTheme.hudText }}>
                                             <IconShop active={activeTab === 'shop'} />
+                                        </button>
+                                        <button onClick={() => { sound.playBlip(); setShowSyncModal(true); }} className="p-1 active:scale-95 leading-none" title="Cross-device sync">
+                                            <span className="text-lg">
+                                                {!syncConfig ? '🔌' : syncStatus === 'syncing' ? '🔄' : syncStatus === 'error' ? '⚠️' : '☁️'}
+                                            </span>
                                         </button>
                                     </div>
                                 </div>
@@ -975,23 +1174,23 @@
                                         </div>
                                     </div>
 
-                                    {/* Rewards Section */}
+                                    {/* Achievements Section */}
                                     <div className="pixel-box-sm p-4 mb-6" style={{ backgroundColor: activeTheme.windowBg }}>
-                                        <h3 className="text-[12px] mb-4" style={{ color: activeTheme.primary }}>REAL LIFE REWARDS</h3>
+                                        <h3 className="text-[12px] mb-4" style={{ color: activeTheme.primary }}>🏆 TROPHY CASE</h3>
                                         <div className="grid grid-cols-1 gap-3">
-                                            {SHOP_REWARDS.map(r => (
-                                                <div key={r.id} className="flex justify-between items-center p-3 pixel-box-sm bg-white/50">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-[10px] max-w-[150px] leading-tight">{r.name}</span>
+                                            {ACHIEVEMENTS.map(a => {
+                                                const unlocked = a.check(achievementStats);
+                                                return (
+                                                    <div key={a.id} className={`flex items-center gap-3 p-3 pixel-box-sm ${unlocked ? 'bg-white/70' : 'bg-black/10 opacity-60'}`}>
+                                                        <span className={`text-lg flex-shrink-0 ${unlocked ? '' : 'grayscale'}`}>{a.icon}</span>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-[10px] leading-tight">{a.name}</div>
+                                                            <div className="text-[8px] opacity-70 mt-0.5 leading-tight">{a.desc}</div>
+                                                        </div>
+                                                        {unlocked && <span className="text-[8px] pixel-box-sm px-2 py-1 bg-green-500 text-white flex-shrink-0">DONE</span>}
                                                     </div>
-                                                    <button 
-                                                        onClick={() => handleBuyReward(r.cost)}
-                                                        className={`buy-btn pixel-box-sm px-3 py-2 text-[10px] active:scale-90 flex-shrink-0 ${gold >= r.cost ? '' : 'opacity-50'}`}
-                                                    >
-                                                        {r.cost}G
-                                                    </button>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
 
@@ -1254,6 +1453,78 @@
                                         <button type="submit" className="flex-1 pixel-box-sm py-3 text-xs bg-blue-500 text-white active:scale-95">CREATE</button>
                                     </div>
                                 </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- SYNC MODAL --- */}
+                    {showSyncModal && (
+                        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                            <div className="w-full max-w-md pixel-box bg-white p-6 animate-pop max-h-[90vh] overflow-y-auto hide-scrollbar text-black" style={{ backgroundColor: activeTheme.windowBg }}>
+                                <h2 className="text-sm mb-4">☁️ CROSS-DEVICE SYNC</h2>
+
+                                {syncConfig ? (
+                                    <div>
+                                        {justCreatedBinId === syncConfig.binId && (
+                                            <div className="mb-4 p-3 pixel-box-sm bg-yellow-100 text-center">
+                                                <p className="text-[8px] mb-1">🎉 NEW SYNC CREATED — SAVE THIS BIN ID FOR THE OTHER DEVICE:</p>
+                                                <p className="text-sm font-bold break-all">{syncConfig.binId}</p>
+                                            </div>
+                                        )}
+                                        <p className="text-[10px] mb-3 opacity-70">Enter this same API Key + Bin ID on the other device to see the same quests there.</p>
+                                        <div className="mb-3">
+                                            <p className="text-[8px] mb-1 opacity-60">BIN ID</p>
+                                            <input readOnly value={syncConfig.binId} onFocus={(e) => e.target.select()} className="w-full pixel-box-sm p-2 text-[10px] bg-white text-black" />
+                                        </div>
+                                        <p className="text-[8px] mb-4 opacity-60">
+                                            Status: {syncStatus === 'syncing' ? 'Syncing…' : syncStatus === 'error' ? 'Connection error — will retry next sync' : 'Synced'}
+                                        </p>
+                                        <div className="flex gap-3">
+                                            <button type="button" onClick={() => { sound.playBlip(); pullNow(); }} className="flex-1 pixel-box-sm py-3 text-xs bg-blue-500 text-white active:scale-95">SYNC NOW</button>
+                                            <button type="button" onClick={() => { sound.playError(); disconnectSync(); }} className="flex-1 pixel-box-sm py-3 text-xs bg-red-500 text-white active:scale-95">DISCONNECT</button>
+                                        </div>
+                                        <button type="button" onClick={() => { sound.playBlip(); setShowSyncModal(false); }} className="w-full mt-3 pixel-box-sm py-2 text-[10px] bg-gray-300 text-black active:scale-95">CLOSE</button>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <p className="text-[10px] mb-4 opacity-70">Uses a free JSONBin.io account — no email sign-in on this end, just an API key. Grab a free key at jsonbin.io, paste it below.</p>
+
+                                        <input
+                                            type="text" value={syncFormKey} onChange={(e) => setSyncFormKey(e.target.value)}
+                                            placeholder="JSONBIN API KEY"
+                                            className="w-full pixel-box-sm p-3 text-[10px] mb-3 bg-white text-black focus:outline-none"
+                                        />
+
+                                        <button
+                                            type="button"
+                                            onClick={() => syncFormKey && createNewBin(syncFormKey)}
+                                            disabled={!syncFormKey || syncStatus === 'syncing'}
+                                            className={`w-full pixel-box-sm py-3 text-xs bg-green-500 text-white active:scale-95 mb-4 ${(!syncFormKey || syncStatus === 'syncing') ? 'opacity-50' : ''}`}
+                                        >
+                                            CREATE NEW SYNC (first device)
+                                        </button>
+
+                                        <div className="text-center text-[8px] opacity-50 mb-4">— OR, if the other device already made one —</div>
+
+                                        <input
+                                            type="text" value={syncFormBinId} onChange={(e) => setSyncFormBinId(e.target.value)}
+                                            placeholder="PASTE BIN ID HERE"
+                                            className="w-full pixel-box-sm p-3 text-[10px] mb-3 bg-white text-black focus:outline-none"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => syncFormKey && syncFormBinId && connectToBin(syncFormKey, syncFormBinId)}
+                                            disabled={!syncFormKey || !syncFormBinId || syncStatus === 'syncing'}
+                                            className={`w-full pixel-box-sm py-3 text-xs bg-blue-500 text-white active:scale-95 ${(!syncFormKey || !syncFormBinId || syncStatus === 'syncing') ? 'opacity-50' : ''}`}
+                                        >
+                                            CONNECT TO EXISTING
+                                        </button>
+
+                                        {syncError && <p className="text-[10px] text-red-500 mt-3">{syncError}</p>}
+
+                                        <button type="button" onClick={() => { sound.playBlip(); setShowSyncModal(false); }} className="w-full mt-4 pixel-box-sm py-2 text-[10px] bg-gray-300 text-black active:scale-95">CLOSE</button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
