@@ -50,8 +50,8 @@
             border-radius: 2px;
         }
 
-        .font-arcade { font-family: 'Silkscreen', cursive; }
-        .font-sans { font-family: 'Silkscreen', cursive; } /* Unified to Silkscreen */
+        .font-arcade { font-family: 'Silkscreen', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji', cursive; }
+        .font-sans { font-family: 'Silkscreen', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji', cursive; } /* Unified to Silkscreen */
 
         @keyframes float {
             0% { transform: translateY(0px); }
@@ -70,6 +70,18 @@
         .pb-safe { padding-bottom: env(safe-area-inset-bottom, 24px); }
         .pt-safe { padding-top: env(safe-area-inset-top, 12px); }
         
+        @keyframes confettiFall {
+            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+        }
+        .confetti-piece {
+            position: fixed;
+            top: 0;
+            z-index: 9999;
+            pointer-events: none;
+            animation: confettiFall 2.5s ease-out forwards;
+        }
+
         /* Clean Date Input Fix */
         input[type="date"] {
             box-sizing: border-box;
@@ -267,6 +279,45 @@
             return d.toISOString().split('T')[0];
         };
 
+        const Confetti = ({ trigger }) => {
+            const [particles, setParticles] = React.useState([]);
+            
+            React.useEffect(() => {
+                if (trigger > 0) {
+                    const colors = ['#fde047', '#4ade80', '#60a5fa', '#f87171', '#c084fc'];
+                    const newParticles = Array.from({ length: 40 }).map((_, i) => ({
+                        id: Date.now() + i,
+                        left: Math.random() * 100 + 'vw',
+                        color: colors[Math.floor(Math.random() * colors.length)],
+                        size: Math.random() * 6 + 4 + 'px',
+                        delay: Math.random() * 0.2 + 's',
+                        duration: Math.random() * 1 + 1.5 + 's',
+                        shape: Math.random() > 0.5 ? '50%' : '0%'
+                    }));
+                    setParticles(newParticles);
+                    const timer = setTimeout(() => setParticles([]), 3000);
+                    return () => clearTimeout(timer);
+                }
+            }, [trigger]);
+
+            if (particles.length === 0) return null;
+            return (
+                <div className="fixed inset-0 pointer-events-none z-[200] overflow-hidden">
+                    {particles.map(p => (
+                        <div key={p.id} className="confetti-piece pixel-box-sm border-black/20" style={{
+                            left: p.left,
+                            backgroundColor: p.color,
+                            width: p.size,
+                            height: p.size,
+                            borderRadius: p.shape,
+                            animationDelay: p.delay,
+                            animationDuration: p.duration
+                        }} />
+                    ))}
+                </div>
+            );
+        };
+
         function App() {
             const [isDataLoaded, setIsDataLoaded] = useState(false);
             
@@ -285,9 +336,9 @@
             ];
 
             const initialLibraryCategories = [
-                { id: 'cat1', name: 'GAMES TO PLAY' },
-                { id: 'cat2', name: 'BOOKS TO READ' },
-                { id: 'cat3', name: 'MOVIES' }
+                { id: 'cat1', name: 'GAMES TO PLAY', emoji: '🎮' },
+                { id: 'cat2', name: 'BOOKS TO READ', emoji: '📚' },
+                { id: 'cat3', name: 'MOVIES', emoji: '🎬' }
             ];
 
             const [tasks, setTasks] = useState([]);
@@ -313,6 +364,7 @@
             const [isManagingBoard, setIsManagingBoard] = useState(false);
             const [isAddingLibCat, setIsAddingLibCat] = useState(false);
             const [focusTaskId, setFocusTaskId] = useState(null);
+            const [confettiTrigger, setConfettiTrigger] = useState(0);
 
             // Level calculation
             useEffect(() => {
@@ -396,6 +448,7 @@
                     sound.playCoin();
                     setXp(prev => prev + 50);
                     setGold(prev => prev + 10);
+                    setConfettiTrigger(prev => prev + 1);
                 } else {
                     sound.playBlip(300);
                 }
@@ -411,6 +464,7 @@
                 sound.playCoin();
                 setXp(prev => prev + 50);
                 setGold(prev => prev + 10);
+                setConfettiTrigger(prev => prev + 1);
                 setFocusTaskId(null);
             };
 
@@ -499,8 +553,9 @@
             const handleAddLibCategory = (e) => {
                 e.preventDefault();
                 const name = e.target.catName.value.trim().toUpperCase();
+                const emoji = e.target.catEmoji.value.trim();
                 if (!name) return;
-                const newCat = { id: 'c_'+Date.now(), name };
+                const newCat = { id: 'c_'+Date.now(), name, emoji };
                 setLibraryCategories([...libraryCategories, newCat]);
                 setActiveLibCat(newCat.id);
                 setIsAddingLibCat(false);
@@ -580,11 +635,11 @@
                                         <button onClick={() => { sound.playBlip(); setActiveTab('list'); }} className={`p-1 active:scale-95 transition-colors`} style={{ color: activeTheme.hudText }}>
                                             <IconList active={activeTab === 'list'} />
                                         </button>
-                                        <button onClick={() => { sound.playBlip(); setActiveTab('shop'); }} className={`p-1 active:scale-95 transition-colors`} style={{ color: activeTheme.hudText }}>
-                                            <IconShop active={activeTab === 'shop'} />
-                                        </button>
                                         <button onClick={() => { sound.playBlip(); setActiveTab('library'); }} className={`p-1 active:scale-95 transition-colors`} style={{ color: activeTheme.hudText }}>
                                             <IconLibrary active={activeTab === 'library'} />
+                                        </button>
+                                        <button onClick={() => { sound.playBlip(); setActiveTab('shop'); }} className={`p-1 active:scale-95 transition-colors`} style={{ color: activeTheme.hudText }}>
+                                            <IconShop active={activeTab === 'shop'} />
                                         </button>
                                     </div>
                                 </div>
@@ -624,13 +679,43 @@
                                         + NEW BOARD
                                     </button>
                                 </div>
-                            ) : activeTab === 'shop' ? (
-                                <div className="flex-1 px-4 py-3 text-xs opacity-70 flex items-center">
-                                    THE TAVERN
+                            ) : activeTab === 'library' ? (
+                                <div className="flex overflow-x-auto hide-scrollbar px-2 py-2 gap-2 items-center flex-1">
+                                    <button
+                                        onClick={() => { sound.playBlip(); setActiveLibCat('all'); }}
+                                        className={`px-3 py-2 pixel-box-sm text-[10px] whitespace-nowrap active:scale-95 ${activeLibCat === 'all' ? 'bg-white text-black' : 'bg-transparent text-inherit'}`}
+                                        style={{ borderColor: activeTheme.hudText, color: activeLibCat !== 'all' ? activeTheme.hudText : 'black' }}
+                                    >
+                                        ALL
+                                    </button>
+                                    {libraryCategories.map(cat => (
+                                        <div key={cat.id} className="flex items-center">
+                                            <button
+                                                onClick={() => { sound.playBlip(); setActiveLibCat(cat.id); }}
+                                                className={`px-3 py-2 pixel-box-sm text-[10px] whitespace-nowrap active:scale-95 flex items-center gap-1.5 ${activeLibCat === cat.id ? 'bg-white text-black' : 'bg-transparent text-inherit'}`}
+                                                style={{ borderColor: activeTheme.hudText, color: activeLibCat !== cat.id ? activeTheme.hudText : 'black' }}
+                                            >
+                                                {cat.emoji && <span className="text-xs">{cat.emoji}</span>}
+                                                <span>{cat.name}</span>
+                                            </button>
+                                            {activeLibCat === cat.id && (
+                                                <button onClick={() => handleDeleteLibCategory(cat.id)} className="ml-1 p-2 text-red-500 hover:bg-red-500/20 active:scale-90 rounded" title="Delete List">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <button 
+                                        onClick={() => { sound.playBlip(); setIsAddingLibCat(true); }}
+                                        className="px-3 py-2 pixel-box-sm text-[10px] whitespace-nowrap bg-black/40 text-white active:scale-95 border-dashed"
+                                        style={{ borderColor: activeTheme.hudText }}
+                                    >
+                                        + NEW LIST
+                                    </button>
                                 </div>
                             ) : (
                                 <div className="flex-1 px-4 py-3 text-xs opacity-70 flex items-center">
-                                    THE ARCHIVE
+                                    THE TAVERN
                                 </div>
                             )}
 
@@ -684,89 +769,139 @@
 
                         {}
                         {activeTab === 'list' && (
-                            <div className="flex-1 overflow-y-auto p-4 pb-safe hide-scrollbar bg-black/5 h-full">
-                                <div className="max-w-[500px] mx-auto pixel-box bg-white/50 p-4" style={{ backgroundColor: activeTheme.windowBg }}>
-                                    <div className="flex justify-between items-center mb-6 border-b-4 pb-2" style={{ borderColor: activeTheme.border }}>
+                            <div className="flex-1 overflow-hidden flex flex-col p-4 pb-safe bg-black/5 h-full">
+                                <div className="max-w-[500px] mx-auto w-full flex-1 flex flex-col min-h-0 pixel-box bg-white/50 !rounded-t-[4px] !rounded-b-[40px] overflow-hidden" style={{ backgroundColor: activeTheme.windowBg }}>
+                                    <div className="p-3 border-b-4 bg-black/10 flex justify-between items-center flex-shrink-0" style={{ borderColor: activeTheme.border }}>
                                         <h2 className="text-sm">{activeBoardId !== 'all' ? `${activeBoardObj.name}` : 'ALL QUESTS'}</h2>
-                                        <button onClick={() => { sound.playBlip(); setIsAddingQuest(true); }} className="bg-yellow-400 text-black px-2 py-1 pixel-box-sm text-[10px] active:scale-90">
+                                        <button onClick={() => { sound.playBlip(); setIsAddingQuest(true); }} className="bg-yellow-400 text-black px-2 py-1 pixel-box-sm text-[10px] active:scale-90 flex-shrink-0">
                                             + ADD QUEST
                                         </button>
                                     </div>
                                     
-                                    {['Overdue', 'Today', 'Tomorrow', 'Upcoming', 'No Date'].map(group => {
-                                        const groupedTasks = filteredTasks.filter(t => t.status !== 'done' && getTaskGroup(t.dueDate) === group);
-                                        if (groupedTasks.length === 0) return null;
-                                        
-                                        return (
-                                            <div key={group} className="mb-6">
-                                                <h3 className="text-[10px] opacity-60 mb-2 uppercase tracking-widest flex items-center gap-2">
-                                                    <span className="w-full h-0.5 bg-black/20 block"></span>
-                                                    <span className="whitespace-nowrap">{group}</span>
-                                                    <span className="w-full h-0.5 bg-black/20 block"></span>
-                                                </h3>
+                                    <div className="flex-1 overflow-y-auto p-4 hide-scrollbar">
+                                        {['Overdue', 'Today', 'Tomorrow', 'Upcoming', 'No Date'].map(group => {
+                                            const groupedTasks = filteredTasks.filter(t => t.status !== 'done' && getTaskGroup(t.dueDate) === group);
+                                            if (groupedTasks.length === 0) return null;
+                                            
+                                            return (
+                                                <div key={group} className="mb-6">
+                                                    <h3 className="text-[10px] opacity-60 mb-2 uppercase tracking-widest flex items-center gap-2">
+                                                        <span className="w-full h-0.5 bg-black/20 block"></span>
+                                                        <span className="whitespace-nowrap">{group}</span>
+                                                        <span className="w-full h-0.5 bg-black/20 block"></span>
+                                                    </h3>
+                                                    <div className="flex flex-col gap-2">
+                                                        {groupedTasks.map(t => <TaskCard key={t.id} task={t} compact={true} />)}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+
+                                        {filteredTasks.filter(t => t.status === 'done').length > 0 && (
+                                            <div className="mt-8 opacity-60">
+                                                <h3 className="text-[10px] mb-2 uppercase text-center">VICTORY (DONE)</h3>
                                                 <div className="flex flex-col gap-2">
-                                                    {groupedTasks.map(t => <TaskCard key={t.id} task={t} compact={true} />)}
+                                                    {filteredTasks.filter(t => t.status === 'done').map(t => <TaskCard key={t.id} task={t} compact={true} />)}
                                                 </div>
                                             </div>
-                                        );
-                                    })}
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-                                    {filteredTasks.filter(t => t.status === 'done').length > 0 && (
-                                        <div className="mt-8 opacity-60">
-                                            <h3 className="text-[10px] mb-2 uppercase text-center">VICTORY (DONE)</h3>
-                                            <div className="flex flex-col gap-2">
-                                                {filteredTasks.filter(t => t.status === 'done').map(t => <TaskCard key={t.id} task={t} compact={true} />)}
-                                            </div>
+                        {activeTab === 'shop' && (
+                            <div className="flex-1 overflow-y-auto p-4 pb-safe hide-scrollbar tavern-rewards h-full bg-black/5">
+                                <style>{`
+                                    .tavern-rewards .pixel-box-sm {
+                                        background-color: ${activeTheme.bg} !important;
+                                        border-color: ${activeTheme.border} !important;
+                                        color: ${activeTheme.border} !important;
+                                    }
+                                    .tavern-rewards button.buy-btn {
+                                        background-color: ${activeTheme.primary} !important;
+                                        color: ${activeTheme.bg} !important;
+                                    }
+                                `}</style>
+
+                                <div className="max-w-[500px] mx-auto w-full">
+                                    <div className="text-center mb-6 p-4 pixel-box bg-white/20" style={{ borderColor: activeTheme.border }}>
+                                        <h2 className="text-lg mb-2">THE TAVERN</h2>
+                                        <p className="text-[10px] mb-4">SPEND HARD EARNED GOLD!</p>
+                                        <div className="inline-block pixel-box-sm bg-black text-yellow-400 px-4 py-2 text-xl">
+                                            🪙 {Number.isNaN(gold) ? 0 : gold} G
                                         </div>
-                                    )}
+                                    </div>
+
+                                    {/* Rewards Section */}
+                                    <div className="pixel-box-sm p-4 mb-6" style={{ backgroundColor: activeTheme.windowBg }}>
+                                        <h3 className="text-[12px] mb-4" style={{ color: activeTheme.primary }}>REAL LIFE REWARDS</h3>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {SHOP_REWARDS.map(r => (
+                                                <div key={r.id} className="flex justify-between items-center p-3 pixel-box-sm bg-white/50">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-[10px] max-w-[150px] leading-tight">{r.name}</span>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => handleBuyReward(r.cost)}
+                                                        className={`buy-btn pixel-box-sm px-3 py-2 text-[10px] active:scale-90 flex-shrink-0 ${gold >= r.cost ? '' : 'opacity-50'}`}
+                                                    >
+                                                        {r.cost}G
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Themes Section */}
+                                    <div className="pixel-box-sm p-4 mb-6" style={{ backgroundColor: activeTheme.windowBg }}>
+                                        <h3 className="text-[12px] mb-4" style={{ color: activeTheme.primary }}>🎨 UNLOCK THEMES</h3>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {Object.values(RETRO_THEMES).map(t => {
+                                                const isUnlocked = unlockedThemes.includes(t.id);
+                                                const isActive = themeKey === t.id;
+                                                return (
+                                                    <div key={t.id} className="flex justify-between items-center p-3 pixel-box-sm bg-white/50">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-6 h-6 pixel-box-sm flex-shrink-0" style={{ backgroundColor: t.bg, borderColor: t.border }}></div>
+                                                            <span className="text-[10px]">{t.name}</span>
+                                                        </div>
+                                                        {isUnlocked ? (
+                                                            <button 
+                                                                onClick={() => { sound.playBlip(); setThemeKey(t.id); }}
+                                                                className={`pixel-box-sm px-3 py-2 text-[10px] active:scale-90 ${isActive ? 'bg-green-500 text-white' : 'bg-gray-200 text-black'}`}
+                                                            >
+                                                                {isActive ? 'ACTIVE' : 'EQUIP'}
+                                                            </button>
+                                                        ) : (
+                                                            <button 
+                                                                onClick={() => handleBuyTheme(t.id, t.cost)}
+                                                                className={`buy-btn pixel-box-sm px-3 py-2 text-[10px] active:scale-90 flex-shrink-0 ${gold >= t.cost ? '' : 'opacity-50'}`}
+                                                            >
+                                                                {t.cost}G
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
                                 </div>
                             </div>
                         )}
 
                         {activeTab === 'library' && (
                             <div className="flex-1 overflow-hidden flex flex-col p-4 pb-safe bg-black/5 h-full">
-                                <div className="max-w-[500px] mx-auto w-full flex-1 flex flex-col min-h-0 pixel-box bg-white/50" style={{ backgroundColor: activeTheme.windowBg }}>
+                                <div className="max-w-[500px] mx-auto w-full flex-1 flex flex-col min-h-0 pixel-box bg-white/50 !rounded-t-[4px] !rounded-b-[40px] overflow-hidden" style={{ backgroundColor: activeTheme.windowBg }}>
                                     
-                                    {/* Header & Categories */}
-                                    <div className="p-4 border-b-4 flex-shrink-0" style={{ borderColor: activeTheme.border }}>
-                                        <div className="flex justify-between items-center mb-4">
-                                            <h2 className="text-sm">THE ARCHIVE</h2>
-                                            <button onClick={() => { sound.playBlip(); setIsAddingLibCat(true); }} className="bg-blue-400 text-white px-2 py-1 pixel-box-sm text-[10px] active:scale-90">
-                                                + NEW LIST
-                                            </button>
-                                        </div>
-                                        <div className="flex overflow-x-auto hide-scrollbar gap-2 pb-2">
-                                            <button
-                                                onClick={() => { sound.playBlip(); setActiveLibCat('all'); }}
-                                                className={`px-3 py-1.5 pixel-box-sm text-[10px] whitespace-nowrap active:scale-95 ${activeLibCat === 'all' ? 'bg-black text-white' : 'bg-white text-black'}`}
-                                            >
-                                                ALL
-                                            </button>
-                                            {libraryCategories.map(cat => (
-                                                <div key={cat.id} className="flex items-center flex-shrink-0">
-                                                    <button
-                                                        onClick={() => { sound.playBlip(); setActiveLibCat(cat.id); }}
-                                                        className={`px-3 py-1.5 pixel-box-sm text-[10px] whitespace-nowrap active:scale-95 ${activeLibCat === cat.id ? 'bg-black text-white' : 'bg-white text-black'}`}
-                                                    >
-                                                        {cat.name}
-                                                    </button>
-                                                    {activeLibCat === cat.id && (
-                                                        <button onClick={() => handleDeleteLibCategory(cat.id)} className="ml-1 p-1 text-red-500 hover:bg-red-500/20 active:scale-90 rounded" title="Delete List">
-                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
                                     {/* Add Item Input */}
-                                    <div className="p-3 border-b-4 bg-black/5 flex-shrink-0" style={{ borderColor: activeTheme.border }}>
+                                    <div className="p-3 border-b-4 bg-black/10 flex-shrink-0" style={{ borderColor: activeTheme.border }}>
                                         <form onSubmit={handleAddLibItem} className="flex gap-2">
                                             <input 
                                                 type="text" 
                                                 name="itemText" 
-                                                placeholder={`Add to ${activeLibCat === 'all' ? (libraryCategories[0]?.name || 'Archive') : libraryCategories.find(c => c.id === activeLibCat)?.name}...`} 
+                                                placeholder={`Add to ${activeLibCat === 'all' ? 'Archive' : `${libraryCategories.find(c => c.id === activeLibCat)?.emoji || ''} ${libraryCategories.find(c => c.id === activeLibCat)?.name || 'List'}`.trim()}...`} 
                                                 className="flex-1 pixel-box-sm p-2 text-xs bg-white text-black focus:outline-none" 
                                                 required 
                                                 autoComplete="off" 
@@ -789,7 +924,9 @@
                                                     <div className="flex flex-col min-w-0">
                                                         <span className={`text-xs truncate ${item.done ? 'line-through' : 'text-black'}`}>{item.text}</span>
                                                         {activeLibCat === 'all' && (
-                                                            <span className="text-[8px] opacity-60 text-black mt-0.5">{libraryCategories.find(c => c.id === item.categoryId)?.name || 'Unknown'}</span>
+                                                            <span className="text-[8px] opacity-60 text-black mt-0.5">
+                                                                {`${libraryCategories.find(c => c.id === item.categoryId)?.emoji || ''} ${libraryCategories.find(c => c.id === item.categoryId)?.name || 'Unknown'}`.trim()}
+                                                            </span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -957,13 +1094,40 @@
                         </div>
                     )}
 
-                    {/* --- MANAGE LIB CAT MODAL --- */}
+                    {/* --- MANAGE BOARD MODAL --- */}
+                    {isManagingBoard && (
+                        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                            <div className="w-full max-w-md pixel-box bg-white p-6 animate-pop" style={{ backgroundColor: activeTheme.windowBg }}>
+                                <h2 className="text-sm mb-4">CREATE BOARD</h2>
+                                <form onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const fd = new FormData(e.target);
+                                    const newBoard = { id: 'b_'+Date.now(), name: fd.get('name').toUpperCase() };
+                                    setBoards([...boards, newBoard]);
+                                    setActiveBoardId(newBoard.id);
+                                    sound.playCoin();
+                                    setIsManagingBoard(false);
+                                }}>
+                                    <input type="text" name="name" required placeholder="BOARD NAME" maxLength="15" className="w-full pixel-box-sm p-3 text-[10px] mb-6 bg-white text-black focus:outline-none" />
+                                    <div className="flex gap-3">
+                                        <button type="button" onClick={() => { sound.playBlip(); setIsManagingBoard(false); }} className="flex-1 pixel-box-sm py-3 text-xs bg-gray-300 text-black active:scale-95">CANCEL</button>
+                                        <button type="submit" className="flex-1 pixel-box-sm py-3 text-xs bg-blue-500 text-white active:scale-95">CREATE</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- MANAGE LIBRARY LIST MODAL --- */}
                     {isAddingLibCat && (
                         <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
                             <div className="w-full max-w-md pixel-box bg-white p-6 animate-pop" style={{ backgroundColor: activeTheme.windowBg }}>
-                                <h2 className="text-sm mb-4">NEW ARCHIVE LIST</h2>
+                                <h2 className="text-sm mb-4">CREATE LIST</h2>
                                 <form onSubmit={handleAddLibCategory}>
-                                    <input type="text" name="catName" required placeholder="E.G. MOVIES TO WATCH" maxLength="20" className="w-full pixel-box-sm p-3 text-[10px] mb-6 bg-white text-black focus:outline-none" autoFocus />
+                                    <div className="flex gap-2 mb-6">
+                                        <input type="text" name="catEmoji" placeholder="📁" className="w-14 text-center pixel-box-sm p-3 text-sm bg-white text-black focus:outline-none font-sans" title="List Emoji" />
+                                        <input type="text" name="catName" required placeholder="LIST NAME" maxLength="15" className="flex-1 pixel-box-sm p-3 text-[10px] bg-white text-black focus:outline-none" />
+                                    </div>
                                     <div className="flex gap-3">
                                         <button type="button" onClick={() => { sound.playBlip(); setIsAddingLibCat(false); }} className="flex-1 pixel-box-sm py-3 text-xs bg-gray-300 text-black active:scale-95">CANCEL</button>
                                         <button type="submit" className="flex-1 pixel-box-sm py-3 text-xs bg-blue-500 text-white active:scale-95">CREATE</button>
@@ -972,6 +1136,8 @@
                             </div>
                         </div>
                     )}
+
+                    <Confetti trigger={confettiTrigger} />
 
                 </div>
             );
@@ -983,6 +1149,14 @@
                 return (
                     <div className={`pixel-box p-3 relative group transition-opacity ${isDone ? 'opacity-50' : 'bg-white text-black'}`} style={{ backgroundColor: isDone ? activeTheme.tagBg : activeTheme.windowBg }}>
                         
+                        <button 
+                            onClick={() => handleDeleteTask(task.id)} 
+                            className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center pixel-box-sm bg-red-500 text-white text-[10px] opacity-70 hover:opacity-100 active:scale-90 z-10 transition-opacity"
+                            title="Delete Quest"
+                        >
+                            X
+                        </button>
+
                         <div className="flex items-start gap-3">
                             <button 
                                 onClick={() => handleToggleTaskStatus(task)}
@@ -991,7 +1165,7 @@
                                 {task.status === 'doing' ? 'O' : task.status === 'done' ? 'X' : ''}
                             </button>
                             
-                            <div className="flex-1 min-w-0">
+                            <div className="flex-1 min-w-0 pr-8">
                                 <p className={`text-sm mb-2 break-words leading-tight ${isDone ? 'line-through' : ''}`}>
                                     {task.text}
                                 </p>
@@ -1033,18 +1207,13 @@
                             </div>
                         </div>
 
-                        {/* Hover/Active Actions */}
-                        <div className="mt-3 pt-3 border-t-2 border-black/10 flex justify-between items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                            {isOverdue ? (
-                                <button onClick={() => handleRerollTask(task.id)} className="bg-purple-500 text-white px-2 py-1 pixel-box-sm text-[8px] active:scale-95 flex items-center gap-1">
+                        {isOverdue && (
+                            <div className="mt-3 pt-3 border-t-2 border-black/10 flex justify-center items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                                <button onClick={() => handleRerollTask(task.id)} className="bg-purple-500 text-white px-3 py-1.5 pixel-box-sm text-[10px] active:scale-95 flex items-center gap-1">
                                     🎲 REROLL (5G)
                                 </button>
-                            ) : <div></div>}
-                            
-                            <button onClick={() => handleDeleteTask(task.id)} className="text-red-500 active:scale-90 p-1">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                            </button>
-                        </div>
+                            </div>
+                        )}
                     </div>
                 );
             }
