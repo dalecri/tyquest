@@ -149,6 +149,8 @@
         const ACTIVITY_MONTH_LABEL_H = 11;
         const ACTIVITY_BAND_GAP = 8;
 
+        const NAV_TITLES = { board: 'Kanban', list: 'List', archive: 'My Archive' };
+
         const RETRO_THEMES = {
             snes16bit: {
                 id: 'snes16bit', name: '16-Bit Town', isDark: false, cost: 0,
@@ -1194,7 +1196,7 @@
                                         <HeroAvatar />
                                     </button>
                                     <div>
-                                        <h1 className="text-sm leading-tight">{characterName}</h1>
+                                        <h1 className="text-sm leading-tight">{NAV_TITLES[activeTab] || characterName}</h1>
                                         <p className="text-[10px] opacity-80">LVL {level}</p>
                                     </div>
                                 </div>
