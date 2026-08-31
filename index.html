@@ -425,6 +425,7 @@
             const closeTavern = () => { setTavernClosing(true); sound.playBlip(300); };
             const openActivity = () => { setActivityClosing(false); setShowActivity(true); sound.playBlip(500); };
             const closeActivity = () => { setActivityClosing(true); sound.playBlip(300); };
+            const toggleActivity = () => { if (showActivity) closeActivity(); else openActivity(); };
             
             const [isAddingQuest, setIsAddingQuest] = useState(false);
             const [showSubtasksInput, setShowSubtasksInput] = useState(false);
@@ -1129,18 +1130,26 @@
                                             className={`w-[88vw] max-w-[360px] h-full flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden !rounded-t-[4px] !rounded-b-[40px] transition-transform ${isDropTarget ? 'scale-[1.02] ring-4 ring-yellow-300' : ''}`} 
                                             style={{ backgroundColor: colColor }}
                                         >
-                                            <div 
-                                                className={`p-3 border-b-4 border-black/50 bg-black/20 flex items-center justify-between text-white text-xs sticky top-0 z-10 backdrop-blur-sm ${colId === 'done' ? 'active:scale-[0.98] cursor-pointer' : ''}`}
-                                                onClick={() => { if (colId === 'done') openActivity(); }}
-                                            >
-                                                <span className="truncate pr-2">{colLabel} <span className="opacity-50 text-[10px]">({colTasks.length})</span></span>
-                                                {colId === 'todo' && (
-                                                    <button onClick={() => { sound.playBlip(); setIsAddingQuest(true); }} className="bg-yellow-400 text-black px-2 py-1 pixel-box-sm active:scale-90 flex-shrink-0">
-                                                        + ADD
-                                                    </button>
-                                                )}
-                                                {colId === 'done' && <span className="text-[9px] opacity-70 flex-shrink-0">📊</span>}
-                                            </div>
+                                            {colId === 'done' ? (
+                                                <button
+                                                    onClick={toggleActivity}
+                                                    className="w-full p-3 border-b-4 border-black/50 bg-black/20 flex items-center justify-between text-white text-xs sticky top-0 z-10 backdrop-blur-sm active:bg-black/40 active:scale-[0.98]"
+                                                >
+                                                    <span className="truncate pr-2">{colLabel} <span className="opacity-50 text-[10px]">({colTasks.length})</span></span>
+                                                    <span className="text-[9px] pixel-box-sm px-2 py-1 bg-yellow-400 text-black flex-shrink-0 flex items-center gap-1">
+                                                        📊 ACTIVITY
+                                                    </span>
+                                                </button>
+                                            ) : (
+                                                <div className="p-3 border-b-4 border-black/50 bg-black/20 flex items-center justify-between text-white text-xs sticky top-0 z-10 backdrop-blur-sm">
+                                                    <span className="truncate pr-2">{colLabel} <span className="opacity-50 text-[10px]">({colTasks.length})</span></span>
+                                                    {colId === 'todo' && (
+                                                        <button onClick={() => { sound.playBlip(); setIsAddingQuest(true); }} className="bg-yellow-400 text-black px-2 py-1 pixel-box-sm active:scale-90 flex-shrink-0">
+                                                            + ADD
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
                                             <div className="p-3 overflow-y-auto hide-scrollbar flex-1 flex flex-col gap-3 pb-safe">
                                                 {colTasks.length === 0 && (
                                                     <div className="text-center opacity-50 text-[10px] py-8 text-black">
@@ -1187,12 +1196,13 @@
 
                                         {filteredTasks.filter(t => t.status === 'done').length > 0 && (
                                             <div className="mt-8 opacity-60">
-                                                <h3 
-                                                    className="text-[10px] mb-2 uppercase text-center text-black active:scale-95 cursor-pointer"
-                                                    onClick={openActivity}
+                                                <button 
+                                                    onClick={toggleActivity}
+                                                    className="mx-auto mb-2 flex items-center gap-2 pixel-box-sm px-3 py-1.5 bg-yellow-400 text-black text-[9px] active:scale-95"
                                                 >
-                                                    VICTORY (DONE) 📊
-                                                </h3>
+                                                    <span>VICTORY (DONE)</span>
+                                                    <span>📊 ACTIVITY</span>
+                                                </button>
                                                 <div className="flex flex-col gap-2">
                                                     {filteredTasks.filter(t => t.status === 'done').map(t => <TaskCard key={t.id} task={t} compact={true} />)}
                                                 </div>
