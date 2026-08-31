@@ -48,8 +48,7 @@
             border-radius: 2px;
         }
 
-        .font-arcade { font-family: 'Silkscreen', cursive, system-ui, sans-serif; }
-        .font-sans { font-family: 'Silkscreen', cursive, system-ui, sans-serif; }
+        .font-arcade { font-family: 'Silkscreen', cursive, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji; }
 
         @keyframes float {
             0% { transform: translateY(0px); }
@@ -68,7 +67,6 @@
         .pb-safe { padding-bottom: env(safe-area-inset-bottom, 24px); }
         .pt-safe { padding-top: env(safe-area-inset-top, 12px); }
         
-        /* Clean Date Input Fix */
         input[type="date"] {
             box-sizing: border-box;
             appearance: none;
@@ -124,13 +122,8 @@
                 bg: '#b9cc9f', windowBg: '#e6ebd8', hudBg: '#2b3b24', hudText: '#e6ebd8',
                 border: '#2b3b24', primary: '#425a37', colTodo: '#a3b888', colDoing: '#92a777', colDone: '#819666', tagBg: '#c5d6af'
             },
-            cyberArcade: {
-                id: 'cyberArcade', name: 'Neon Arcade', isDark: true, cost: 100,
-                bg: '#05010a', windowBg: '#130424', hudBg: '#090114', hudText: '#00ffff',
-                border: '#ff007f', primary: '#00ffff', colTodo: '#ff0055', colDoing: '#b300ff', colDone: '#00ffaa', tagBg: '#2b0b4a'
-            },
             mexicanCafe: {
-                id: 'mexicanCafe', name: 'Mexican Cafe', isDark: false, cost: 250,
+                id: 'mexicanCafe', name: 'Mexican Cafe', isDark: false, cost: 150,
                 bg: '#dfb182', windowBg: '#f2e3cb', hudBg: '#592c1a', hudText: '#f2e3cb',
                 border: '#36180c', primary: '#b8522b', colTodo: '#d97d43', colDoing: '#c26636', colDone: '#8f4f2c', tagBg: '#e6ccb2'
             }
@@ -333,7 +326,7 @@
                 setLevel(Math.floor(xp / 100) + 1);
             }, [xp]);
 
-            // Mobile Drag Polyfill Setup (Increased speed by 15%: holdToDrag 255ms instead of 300ms)
+            // Mobile Drag Polyfill Setup (Snappier 255ms hold)
             useEffect(() => {
                 if (window.MobileDragDrop) {
                     window.MobileDragDrop.polyfill({
@@ -390,10 +383,12 @@
             const triggerConfetti = () => {
                 if (window.confetti) {
                     window.confetti({
-                        particleCount: 100,
-                        spread: 70,
-                        origin: { y: 0.6 },
-                        colors: [activeTheme.primary, activeTheme.hudText, '#FFD700']
+                        particleCount: 30,
+                        spread: 60,
+                        origin: { y: 0.1 },
+                        colors: [activeTheme.primary, activeTheme.hudText, '#FFD700', '#ffffff'],
+                        shapes: ['square'],
+                        scalar: 0.8
                     });
                 }
             };
@@ -763,6 +758,7 @@
                         </div>
                     </header>
 
+                    {}
                     <main className="flex-1 overflow-hidden relative flex flex-col min-h-0 h-full">
                         
                         {activeTab === 'board' && (
@@ -1020,7 +1016,7 @@
                                 
                                 <div className="grid grid-cols-3 gap-2 text-center mb-2">
                                     <div className="pixel-box-sm p-2 bg-black/5 text-black">
-                                        <div className="text-lg text-yellow-600 mb-1">🪙</div>
+                                        <div className="text-lg mb-1"><GoldBadge amount="" /></div>
                                         <div className="text-xs">{Number.isNaN(gold) ? 0 : gold}</div>
                                         <div className="text-[7px] opacity-70 mt-1">GOLD</div>
                                     </div>
