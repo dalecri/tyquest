@@ -422,6 +422,10 @@
             const [xp, setXp] = useState(0);
             const [level, setLevel] = useState(1);
             const [gold, setGold] = useState(0);
+            const [totalGoldEarned, setTotalGoldEarned] = useState(0); // lifetime total, never decreases when gold is spent
+            const [characterName, setCharacterName] = useState('TYLER');
+            const [isEditingName, setIsEditingName] = useState(false);
+            const [nameDraft, setNameDraft] = useState('');
             
             const [themeKey, setThemeKey] = useState('snes16bit');
             const [unlockedThemes, setUnlockedThemes] = useState(Object.keys(RETRO_THEMES)); // TESTING: all themes unlocked — change back to ['snes16bit'] before shipping to Tyler
@@ -520,6 +524,8 @@
                     
                     const savedXp = await loadFromDB('tq_xp');
                     const savedGold = await loadFromDB('tq_gold');
+                    const savedTotalGoldEarned = await loadFromDB('tq_total_gold_earned');
+                    const savedCharacterName = await loadFromDB('tq_character_name');
                     const savedTheme = await loadFromDB('tq_theme');
                     const savedUnlockedThemes = await loadFromDB('tq_unlocked_themes');
 
@@ -530,6 +536,8 @@
                     
                     if (savedXp !== null && !isNaN(parseInt(savedXp, 10))) setXp(parseInt(savedXp, 10)); else setXp(0);
                     if (savedGold !== null && !isNaN(parseInt(savedGold, 10))) setGold(parseInt(savedGold, 10)); else setGold(0);
+                    if (savedTotalGoldEarned !== null && !isNaN(parseInt(savedTotalGoldEarned, 10))) setTotalGoldEarned(parseInt(savedTotalGoldEarned, 10));
+                    if (savedCharacterName) setCharacterName(savedCharacterName);
                     
                     if (savedTheme) setThemeKey(savedTheme);
                     if (savedUnlockedThemes) setUnlockedThemes(savedUnlockedThemes);
@@ -550,6 +558,8 @@
                 if (snap.libraryItems) setLibraryItems(snap.libraryItems);
                 if (typeof snap.xp === 'number') setXp(snap.xp);
                 if (typeof snap.gold === 'number') setGold(snap.gold);
+                if (typeof snap.totalGoldEarned === 'number') setTotalGoldEarned(snap.totalGoldEarned);
+                if (snap.characterName) setCharacterName(snap.characterName);
                 if (snap.themeKey) setThemeKey(snap.themeKey);
                 if (snap.unlockedThemes) setUnlockedThemes(snap.unlockedThemes);
             };
@@ -625,7 +635,7 @@
                     const url = databaseURL.trim().replace(/\/$/, '');
                     const roomCode = generateRoomCode();
                     const cfg = { databaseURL: url, roomCode };
-                    const snapshot = { tasks, boards, libraryCategories, libraryItems, xp, gold, themeKey, unlockedThemes };
+                    const snapshot = { tasks, boards, libraryCategories, libraryItems, xp, gold, totalGoldEarned, characterName, themeKey, unlockedThemes };
                     await firebasePush(cfg, snapshot);
                     hasSyncedOnceRef.current = true;
                     saveSyncConfig(cfg);
@@ -656,6 +666,8 @@
                 saveToDB('tq_libItems', libraryItems);
                 saveToDB('tq_xp', xp.toString());
                 saveToDB('tq_gold', gold.toString());
+                saveToDB('tq_total_gold_earned', totalGoldEarned.toString());
+                saveToDB('tq_character_name', characterName);
                 saveToDB('tq_theme', themeKey);
                 saveToDB('tq_unlocked_themes', unlockedThemes);
 
@@ -667,7 +679,7 @@
                 pushTimerRef.current = setTimeout(async () => {
                     try {
                         setSyncStatus('syncing');
-                        await firebasePush(syncConfig, { tasks, boards, libraryCategories, libraryItems, xp, gold, themeKey, unlockedThemes });
+                        await firebasePush(syncConfig, { tasks, boards, libraryCategories, libraryItems, xp, gold, totalGoldEarned, characterName, themeKey, unlockedThemes });
                         setSyncStatus('synced');
                     } catch (e) {
                         setSyncStatus('error');
@@ -675,7 +687,7 @@
                         pendingPushRef.current = false;
                     }
                 }, 1500);
-            }, [tasks, boards, libraryCategories, libraryItems, xp, gold, themeKey, unlockedThemes, isDataLoaded, syncConfig]);
+            }, [tasks, boards, libraryCategories, libraryItems, xp, gold, totalGoldEarned, characterName, themeKey, unlockedThemes, isDataLoaded, syncConfig]);
 
             const activeTheme = RETRO_THEMES[themeKey] || RETRO_THEMES.snes16bit;
 
@@ -808,6 +820,7 @@
                 triggerConfetti();
                 setXp(prev => prev + reward.xp + streakBonusXp);
                 setGold(prev => prev + reward.gold + streakBonusGold);
+                setTotalGoldEarned(prev => prev + reward.gold + streakBonusGold);
 
                 if (focusTaskId === task.id) setFocusTaskId(null);
             };
@@ -836,6 +849,7 @@
                         sound.playBlip(700);
                         setXp(prev => prev + 5);
                         setGold(prev => prev + 1);
+                        setTotalGoldEarned(prev => prev + 1);
                     }
                     
                     return { ...t, subtasks: newSubs };
@@ -1180,7 +1194,7 @@
                                         <HeroAvatar />
                                     </button>
                                     <div>
-                                        <h1 className="text-sm leading-tight">TYLER</h1>
+                                        <h1 className="text-sm leading-tight">{characterName}</h1>
                                         <p className="text-[10px] opacity-80">LVL {level}</p>
                                     </div>
                                 </div>
@@ -1300,7 +1314,7 @@
                                         <div 
                                             key={colId} 
                                             data-colid={colId}
-                                            className={`w-[88vw] max-w-[360px] h-full flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden !rounded-t-[4px] !rounded-b-[40px] transition-transform ${isDropTarget ? 'scale-[1.02] ring-4 ring-yellow-300' : ''}`} 
+                                            className={`w-[88vw] max-w-[360px] h-full flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden transition-transform ${isDropTarget ? 'scale-[1.02] ring-4 ring-yellow-300' : ''}`} 
                                             style={{ backgroundColor: colColor }}
                                         >
                                             {colId === 'done' ? (
@@ -1339,7 +1353,7 @@
 
                         {activeTab === 'list' && (
                             <div className="flex-1 overflow-x-auto snap-x snap-mandatory hide-scrollbar p-4 flex gap-4 items-start h-full pb-8">
-                                <div className="w-[100%] max-w-[500px] h-full mx-auto flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden !rounded-t-[4px] !rounded-b-[40px]" style={{ backgroundColor: activeTheme.windowBg }}>
+                                <div className="w-[100%] max-w-[500px] h-full mx-auto flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden" style={{ backgroundColor: activeTheme.windowBg }}>
                                     
                                     <div className="p-3 border-b-4 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm bg-white/50" style={{ borderColor: activeTheme.border }}>
                                         <h2 className="text-sm text-black">{activeBoardId !== 'all' ? `${activeBoardObj.name}` : 'ALL QUESTS'}</h2>
@@ -1369,13 +1383,7 @@
 
                                         {filteredTasks.filter(t => t.status === 'done').length > 0 && (
                                             <div className="mt-8 opacity-60">
-                                                <button 
-                                                    onClick={toggleActivity}
-                                                    className="mx-auto mb-2 flex items-center gap-2 pixel-box-sm px-3 py-1.5 bg-yellow-400 text-black text-[9px] active:scale-95"
-                                                >
-                                                    <span>VICTORY (DONE)</span>
-                                                    <span>📊 ACTIVITY</span>
-                                                </button>
+                                                <h3 className="text-[10px] mb-2 uppercase text-center text-black">VICTORY (DONE)</h3>
                                                 <div className="flex flex-col gap-2">
                                                     {filteredTasks.filter(t => t.status === 'done').map(t => <TaskCard key={t.id} task={t} compact={true} />)}
                                                 </div>
@@ -1389,7 +1397,7 @@
 
                         {activeTab === 'archive' && (
                             <div className="flex-1 overflow-x-auto snap-x snap-mandatory hide-scrollbar p-4 flex gap-4 items-start h-full pb-8">
-                                <div className="w-[100%] max-w-[500px] h-full mx-auto flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden !rounded-t-[4px] !rounded-b-[40px]" style={{ backgroundColor: activeTheme.windowBg }}>
+                                <div className="w-[100%] max-w-[500px] h-full mx-auto flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden" style={{ backgroundColor: activeTheme.windowBg }}>
                                     
                                     <div className="p-3 border-b-4 sticky top-0 z-10 backdrop-blur-sm bg-white/50" style={{ borderColor: activeTheme.border }}>
                                         <form onSubmit={(e) => {
@@ -1457,18 +1465,17 @@
                         style={{ backgroundColor: activeTheme.hudBg, borderTop: `4px solid ${activeTheme.border}` }}
                     >
                         {[
-                            { id: 'board', label: 'BOARD', Icon: IconBoard },
-                            { id: 'list', label: 'LIST', Icon: IconList },
-                            { id: 'archive', label: 'ARCHIVE', Icon: IconArchive }
+                            { id: 'board', Icon: IconBoard },
+                            { id: 'list', Icon: IconList },
+                            { id: 'archive', Icon: IconArchive }
                         ].map(tab => (
                             <button
                                 key={tab.id}
                                 onClick={() => { sound.playBlip(); setActiveTab(tab.id); }}
-                                className="flex-1 flex flex-col items-center justify-center gap-1 py-2 active:bg-black/20"
-                                style={{ color: activeTheme.hudText }}
+                                className="flex-1 flex items-center justify-center py-3 active:bg-black/20"
+                                style={{ color: activeTheme.hudText, opacity: activeTab === tab.id ? 1 : 0.5 }}
                             >
                                 <tab.Icon active={activeTab === tab.id} />
-                                <span className="text-[8px]" style={{ opacity: activeTab === tab.id ? 1 : 0.5 }}>{tab.label}</span>
                             </button>
                         ))}
                     </nav>
@@ -1610,23 +1617,23 @@
 
                                 <div ref={activityContainerRef} className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden" style={{ gap: `${ACTIVITY_BAND_GAP}px` }}>
                                     {activityBands.map((bandWeeks, bandIndex) => (
-                                        <div key={bandIndex} className="flex-shrink-0">
-                                            <div className="flex" style={{ gap: `${ACTIVITY_GAP}px`, height: `${ACTIVITY_MONTH_LABEL_H}px` }}>
+                                        <div key={bandIndex} className="flex-shrink-0 w-full">
+                                            <div className="flex w-full" style={{ gap: `${ACTIVITY_GAP}px`, height: `${ACTIVITY_MONTH_LABEL_H}px` }}>
                                                 {bandWeeks.map((week, wi) => (
-                                                    <div key={wi} className="text-[6px] opacity-60 truncate leading-none" style={{ width: `${activityLayout.cellSize}px`, color: activeTheme.border }}>
+                                                    <div key={wi} className="flex-1 min-w-0 text-[6px] opacity-60 truncate leading-none" style={{ color: activeTheme.border }}>
                                                         {activityMonthLabel(week, wi > 0 ? bandWeeks[wi - 1] : null)}
                                                     </div>
                                                 ))}
                                             </div>
-                                            <div className="flex" style={{ gap: `${ACTIVITY_GAP}px` }}>
+                                            <div className="flex w-full" style={{ gap: `${ACTIVITY_GAP}px` }}>
                                                 {bandWeeks.map((week, wi) => (
-                                                    <div key={wi} className="flex flex-col" style={{ gap: `${ACTIVITY_GAP}px` }}>
+                                                    <div key={wi} className="flex-1 min-w-0 flex flex-col" style={{ gap: `${ACTIVITY_GAP}px` }}>
                                                         {week.map((day, di) => (
                                                             <div
                                                                 key={di}
                                                                 title={day ? `${day.date}: ${day.count} completed` : ''}
-                                                                className="rounded-sm"
-                                                                style={{ width: `${activityLayout.cellSize}px`, height: `${activityLayout.cellSize}px`, ...(day ? activityIntensityStyle(day.count) : { backgroundColor: 'transparent' }) }}
+                                                                className="w-full rounded-sm"
+                                                                style={{ height: `${activityLayout.cellSize}px`, ...(day ? activityIntensityStyle(day.count) : { backgroundColor: 'transparent' }) }}
                                                             ></div>
                                                         ))}
                                                     </div>
@@ -1658,7 +1665,32 @@
                                 </button>
                                 <div className="flex flex-col items-center mb-6">
                                     <HeroAvatar />
-                                    <h2 className="text-xl mt-3 text-black">TYLER</h2>
+                                    {isEditingName ? (
+                                        <div className="flex items-center gap-2 mt-3">
+                                            <input
+                                                type="text"
+                                                value={nameDraft}
+                                                onChange={(e) => setNameDraft(e.target.value)}
+                                                maxLength={16}
+                                                autoFocus
+                                                className="pixel-box-sm p-1 text-sm text-black text-center w-28 focus:outline-none"
+                                            />
+                                            <button 
+                                                onClick={() => { const trimmed = nameDraft.trim(); if (trimmed) setCharacterName(trimmed.toUpperCase()); setIsEditingName(false); sound.playBlip(600); }} 
+                                                className="pixel-box-sm px-2 py-1 text-[10px] bg-green-500 text-white active:scale-95"
+                                            >
+                                                ✓
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button 
+                                            onClick={() => { setNameDraft(characterName); setIsEditingName(true); sound.playBlip(500); }} 
+                                            className="flex items-center gap-1 mt-3 active:scale-95"
+                                        >
+                                            <h2 className="text-xl text-black">{characterName}</h2>
+                                            <span className="text-xs opacity-50">✏️</span>
+                                        </button>
+                                    )}
                                     <p className="text-[10px] opacity-70 text-black">HERO RANK</p>
                                 </div>
                                 
@@ -1677,6 +1709,7 @@
                                         <div className="text-lg mb-1"><GoldBadge amount="" /></div>
                                         <div className="text-xs">{Number.isNaN(gold) ? 0 : gold}</div>
                                         <div className="text-[7px] opacity-70 mt-1">GOLD</div>
+                                        <div className="text-[6px] opacity-50 mt-0.5">EARNED: {totalGoldEarned}</div>
                                     </div>
                                     <button 
                                         onClick={() => { setShowStatsModal(false); openActivity(); }}
