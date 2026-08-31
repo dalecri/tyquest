@@ -91,6 +91,12 @@
         .animate-slide-up-in { animation: slideUpIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
         .animate-slide-down-out { animation: slideDownOut 0.3s cubic-bezier(0.5, 0, 0.75, 0) forwards; }
 
+        @keyframes holdPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.55); }
+            50% { transform: scale(1.03); box-shadow: 0 0 0 6px rgba(255, 215, 0, 0); }
+        }
+        .animate-hold-pulse { animation: holdPulse 0.5s ease-in-out infinite; }
+
         .pb-safe { padding-bottom: env(safe-area-inset-bottom, 24px); }
         .pt-safe { padding-top: env(safe-area-inset-top, 12px); }
         
@@ -318,6 +324,16 @@
             return d.toISOString().split('T')[0];
         };
 
+        // Reward scales with how much a quest actually involves — a Boss quest always pays the
+        // top rate; otherwise more subtasks means more work means a bigger payout.
+        const calculateTaskReward = (task) => {
+            if (task.isBoss) return { xp: 100, gold: 25 };
+            const subtaskCount = (task.subtasks || []).length;
+            if (subtaskCount >= 4) return { xp: 90, gold: 20 };
+            if (subtaskCount >= 2) return { xp: 70, gold: 15 };
+            return { xp: 50, gold: 10 };
+        };
+
         // --- Firebase Realtime Database sync (no email account needed on Tyler's end — just the
         // Database URL + a shared Room Code that both devices use). Uses plain REST + Server-Sent
         // Events so no Firebase SDK/build step is needed; the database's rules must allow open
@@ -426,12 +442,15 @@
             const toggleActivity = () => { if (showActivity) closeActivity(); else openActivity(); };
             
             const [isAddingQuest, setIsAddingQuest] = useState(false);
+            const [editingTaskId, setEditingTaskId] = useState(null);
+            const [editForm, setEditForm] = useState(null); // { text, dueDate, subtasks, boardId, recurrenceType, customValue, customUnit, isBoss }
             const [showSubtasksInput, setShowSubtasksInput] = useState(false);
             const [questDateChoice, setQuestDateChoice] = useState('today'); // 'today' | 'tomorrow' | 'custom'
             const [questDateValue, setQuestDateValue] = useState(getTodayStr());
             const [questRecurrenceType, setQuestRecurrenceType] = useState(null); // null | 'daily' | 'weekly' | 'custom'
             const [questCustomValue, setQuestCustomValue] = useState(2);
             const [questCustomUnit, setQuestCustomUnit] = useState('days'); // 'days' | 'weeks'
+            const [questIsBoss, setQuestIsBoss] = useState(false);
 
             // Reset the quick-pick date + recurrence choice each time the New Quest form opens
             useEffect(() => {
@@ -441,17 +460,20 @@
                     setQuestRecurrenceType(null);
                     setQuestCustomValue(2);
                     setQuestCustomUnit('days');
+                    setQuestIsBoss(false);
                 }
             }, [isAddingQuest]);
 
-            // Turns the New Quest form's repeat picker into the { type, intervalDays } shape stored on the task
-            const buildRecurrence = () => {
-                if (!questRecurrenceType) return null;
-                if (questRecurrenceType === 'daily') return { type: 'daily', intervalDays: 1 };
-                if (questRecurrenceType === 'weekly') return { type: 'weekly', intervalDays: 7 };
-                const n = Math.max(1, parseInt(questCustomValue, 10) || 1);
-                return { type: 'custom', value: n, unit: questCustomUnit, intervalDays: questCustomUnit === 'weeks' ? n * 7 : n };
+            // Turns a repeat-picker choice into the { type, intervalDays } shape stored on the task —
+            // pulled out as a pure function so both the New Quest form and the Edit Quest form can use it.
+            const buildRecurrenceObj = (type, customValue, customUnit) => {
+                if (!type) return null;
+                if (type === 'daily') return { type: 'daily', intervalDays: 1 };
+                if (type === 'weekly') return { type: 'weekly', intervalDays: 7 };
+                const n = Math.max(1, parseInt(customValue, 10) || 1);
+                return { type: 'custom', value: n, unit: customUnit, intervalDays: customUnit === 'weeks' ? n * 7 : n };
             };
+            const buildRecurrence = () => buildRecurrenceObj(questRecurrenceType, questCustomValue, questCustomUnit);
             
             const [isManagingBoard, setIsManagingBoard] = useState(false);
             const [isAddingLibCat, setIsAddingLibCat] = useState(false);
@@ -463,8 +485,10 @@
 
             // Custom pointer-based drag state (replaces native HTML5 DnD, which is unreliable on touch)
             const [dragState, setDragState] = useState(null); // { taskId, x, y, offsetX, offsetY, width, hoverColId }
+            const [holdingTaskId, setHoldingTaskId] = useState(null); // card mid-hold, pulsing, before the drag actually engages
             const dragCandidateRef = useRef(null); // pending drag before the hold threshold clears
             const dragEdgeStepTimeRef = useRef(0); // timestamp of the last edge-triggered column step, gates how fast it can advance
+            const justDraggedRef = useRef(false); // true briefly after a hold-drag engages, to suppress a stray click-to-edit
             const activityContainerRef = useRef(null);
             const dragTimerRef = useRef(null);
 
@@ -679,7 +703,7 @@
                 }
             };
 
-            const handleAddTask = (text, date, boardId, subtasksArr, recurrence) => {
+            const handleAddTask = (text, date, boardId, subtasksArr, recurrence, isBoss) => {
                 const newTask = {
                     id: Date.now().toString(),
                     text,
@@ -687,7 +711,9 @@
                     boardId: boardId === 'all' ? 'general' : boardId,
                     dueDate: date,
                     subtasks: subtasksArr || [],
-                    recurrence: recurrence || null
+                    recurrence: recurrence || null,
+                    isBoss: !!isBoss,
+                    streak: 0
                 };
                 setTasks([newTask, ...tasks]);
                 sound.playBlip(600);
@@ -698,10 +724,68 @@
                 if (boardId && boardId !== 'all') setActiveBoardId(boardId);
             };
 
+            const openEditTask = (task) => {
+                sound.playBlip(500);
+                setEditingTaskId(task.id);
+                setEditForm({
+                    text: task.text,
+                    dueDate: task.dueDate || getTodayStr(),
+                    subtasks: (task.subtasks || []).map(s => ({ ...s })),
+                    boardId: task.boardId === 'general' ? 'all' : task.boardId,
+                    recurrenceType: task.recurrence ? task.recurrence.type : null,
+                    customValue: task.recurrence && task.recurrence.type === 'custom' ? task.recurrence.value : 2,
+                    customUnit: task.recurrence && task.recurrence.type === 'custom' ? task.recurrence.unit : 'days',
+                    isBoss: !!task.isBoss
+                });
+            };
+
+            const closeEditTask = () => {
+                setEditingTaskId(null);
+                setEditForm(null);
+            };
+
+            const saveTaskEdit = () => {
+                if (!editingTaskId || !editForm) return;
+                const text = editForm.text.trim();
+                if (!text) return;
+
+                const recurrence = buildRecurrenceObj(editForm.recurrenceType, editForm.customValue, editForm.customUnit);
+                const resolvedBoardId = editForm.boardId === 'all' ? 'general' : editForm.boardId;
+
+                setTasks(prev => prev.map(t => t.id === editingTaskId ? {
+                    ...t,
+                    text,
+                    dueDate: editForm.dueDate,
+                    subtasks: editForm.subtasks.filter(s => s.text && s.text.trim()).map(s => ({ ...s, text: s.text.trim() })),
+                    boardId: resolvedBoardId,
+                    recurrence,
+                    isBoss: editForm.isBoss
+                } : t));
+
+                sound.playBlip(600);
+                if (resolvedBoardId && resolvedBoardId !== 'general') setActiveBoardId(resolvedBoardId);
+                closeEditTask();
+            };
+
             // Shared by the checkbox toggle, the boss-defeat screen, and drag-to-Victory —
-            // marks a task done, pays out XP/Gold, and spawns the next occurrence if it repeats.
+            // marks a task done, pays out XP/Gold (scaled to difficulty + streak), and spawns
+            // the next occurrence if it repeats.
             const completeTask = (task) => {
                 if (!task || task.status === 'done') return;
+
+                const reward = calculateTaskReward(task);
+
+                // On-time completion extends the streak; finishing it late (after its due date) breaks it.
+                // Computed up front (not inside the setTasks updater) since setXp/setGold below need it now.
+                let newStreak = 0;
+                let streakBonusXp = 0;
+                let streakBonusGold = 0;
+                if (task.recurrence) {
+                    const completedOnTime = !task.dueDate || getTodayStr() <= task.dueDate;
+                    newStreak = completedOnTime ? (task.streak || 0) + 1 : 1;
+                    streakBonusXp = Math.min(newStreak * 2, 50);
+                    streakBonusGold = Math.min(newStreak, 25);
+                }
 
                 setTasks(prevTasks => {
                     const updated = prevTasks.map(t => t.id === task.id ? { ...t, status: 'done', completedAt: getTodayStr() } : t);
@@ -714,6 +798,7 @@
                         status: 'todo',
                         completedAt: null,
                         dueDate: nextDue,
+                        streak: newStreak,
                         subtasks: (task.subtasks || []).map(s => ({ ...s, done: false }))
                     };
                     return [clone, ...updated];
@@ -721,8 +806,8 @@
 
                 sound.playCoin();
                 triggerConfetti();
-                setXp(prev => prev + 50);
-                setGold(prev => prev + 10);
+                setXp(prev => prev + reward.xp + streakBonusXp);
+                setGold(prev => prev + reward.gold + streakBonusGold);
 
                 if (focusTaskId === task.id) setFocusTaskId(null);
             };
@@ -802,11 +887,14 @@
                     sourceStatus: task.status
                 };
                 dragCandidateRef.current = candidate;
+                setHoldingTaskId(task.id);
 
                 clearTimeout(dragTimerRef.current);
                 dragTimerRef.current = setTimeout(() => {
                     if (dragCandidateRef.current !== candidate) return;
                     setDragState({ ...candidate, x: candidate.startX, y: candidate.startY, hoverColId: candidate.sourceStatus });
+                    justDraggedRef.current = true;
+                    setHoldingTaskId(null); // drag is live now — the ghost/dim treatment takes over from here
                     if (navigator.vibrate) navigator.vibrate(10);
                 }, 260);
             };
@@ -823,6 +911,7 @@
                         if (dx > 8 || dy > 8) {
                             clearTimeout(dragTimerRef.current);
                             dragCandidateRef.current = null;
+                            setHoldingTaskId(null);
                         }
                         return;
                     }
@@ -861,6 +950,7 @@
                 const handleUp = () => {
                     clearTimeout(dragTimerRef.current);
                     dragEdgeStepTimeRef.current = 0;
+                    setHoldingTaskId(null);
                     setDragState(prev => {
                         if (prev) {
                             const task = tasks.find(t => t.id === prev.taskId);
@@ -869,6 +959,7 @@
                         return null;
                     });
                     dragCandidateRef.current = null;
+                    if (justDraggedRef.current) setTimeout(() => { justDraggedRef.current = false; }, 50);
                 };
 
                 window.addEventListener('pointermove', handleMove, { passive: false });
@@ -1754,7 +1845,7 @@
                                     if(fd.get('sub2') && fd.get('sub2').trim()) subs.push({id: 's2_'+Date.now(), text: fd.get('sub2').trim(), done: false});
                                     if(fd.get('sub3') && fd.get('sub3').trim()) subs.push({id: 's3_'+Date.now(), text: fd.get('sub3').trim(), done: false});
 
-                                    handleAddTask(fd.get('text'), questDateValue, fd.get('boardId'), subs, buildRecurrence());
+                                    handleAddTask(fd.get('text'), questDateValue, fd.get('boardId'), subs, buildRecurrence(), questIsBoss);
                                 }}>
                                     <textarea 
                                         name="text" required autoFocus
@@ -1845,6 +1936,14 @@
                                             </div>
                                         )}
                                     </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setQuestIsBoss(!questIsBoss)}
+                                        className={`w-full mb-6 pixel-box-sm py-2 text-[10px] active:scale-95 flex items-center justify-center gap-2 ${questIsBoss ? 'bg-red-500 text-white' : 'bg-gray-200 text-black'}`}
+                                    >
+                                        👑 {questIsBoss ? 'BOSS QUEST — +100XP / +25G' : 'MARK AS BOSS QUEST'}
+                                    </button>
                                     
                                     <select name="boardId" defaultValue={activeBoardId} className="w-full pixel-box-sm p-3 text-[10px] mb-6 bg-white text-black">
                                         {boards.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -1855,6 +1954,122 @@
                                         <button type="submit" className="flex-1 pixel-box-sm py-3 text-xs bg-green-500 text-white active:scale-95">SAVE</button>
                                     </div>
                                 </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {editingTaskId && editForm && (
+                        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+                            <div className="w-full max-w-md pixel-box bg-white p-6 animate-pop pb-safe max-h-[90vh] overflow-y-auto hide-scrollbar" style={{ backgroundColor: activeTheme.windowBg }}>
+                                <h2 className="text-sm mb-4">EDIT QUEST</h2>
+
+                                <textarea
+                                    value={editForm.text}
+                                    onChange={(e) => setEditForm({ ...editForm, text: e.target.value })}
+                                    className="font-readable w-full pixel-box-sm p-3 text-[13px] mb-4 min-h-[80px] bg-white text-black focus:outline-none"
+                                ></textarea>
+
+                                <div className="mb-4 space-y-2">
+                                    <p className="text-[8px] opacity-70">SUBTASKS</p>
+                                    {editForm.subtasks.map((sub, idx) => (
+                                        <div key={sub.id || idx} className="flex gap-2 items-center">
+                                            <input
+                                                type="text"
+                                                value={sub.text}
+                                                onChange={(e) => {
+                                                    const next = [...editForm.subtasks];
+                                                    next[idx] = { ...next[idx], text: e.target.value };
+                                                    setEditForm({ ...editForm, subtasks: next });
+                                                }}
+                                                className="font-readable flex-1 pixel-box-sm p-2 text-[13px] bg-white/70 text-black focus:outline-none"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditForm({ ...editForm, subtasks: editForm.subtasks.filter((_, i) => i !== idx) })}
+                                                className="text-red-500 text-[10px] px-2 flex-shrink-0"
+                                            >
+                                                X
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditForm({ ...editForm, subtasks: [...editForm.subtasks, { id: 'e_' + Date.now() + Math.random(), text: '', done: false }] })}
+                                        className="w-full pixel-box-sm py-2 text-[10px] bg-white/50 text-black border-dashed border-2 active:bg-gray-100"
+                                    >
+                                        + ADD SUBTASK
+                                    </button>
+                                </div>
+
+                                <div className="w-full mb-4">
+                                    <p className="text-[8px] mb-1 opacity-70">DUE DATE</p>
+                                    <input
+                                        type="date"
+                                        value={editForm.dueDate}
+                                        onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })}
+                                        className="w-full pixel-box-sm p-3 text-[10px] bg-white text-black block"
+                                    />
+                                </div>
+
+                                <div className="mb-6">
+                                    <p className="text-[8px] mb-2 opacity-70">REPEAT (OPTIONAL)</p>
+                                    <div className="flex gap-2 mb-2">
+                                        {[{ key: null, label: 'NONE' }, { key: 'daily', label: 'DAILY' }, { key: 'weekly', label: 'WEEKLY' }, { key: 'custom', label: 'CUSTOM' }].map(opt => (
+                                            <button
+                                                key={opt.label}
+                                                type="button"
+                                                onClick={() => setEditForm({ ...editForm, recurrenceType: opt.key })}
+                                                className={`flex-1 pixel-box-sm py-2 text-[9px] active:scale-95 ${editForm.recurrenceType === opt.key ? 'bg-purple-400 text-white' : 'bg-gray-200 text-black'}`}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {editForm.recurrenceType === 'custom' && (
+                                        <div className="flex gap-2 items-center p-2 pixel-box-sm bg-purple-50">
+                                            <span className="text-[9px] text-black flex-shrink-0">EVERY</span>
+                                            <input
+                                                type="number" min="1" max="365"
+                                                value={editForm.customValue}
+                                                onChange={(e) => setEditForm({ ...editForm, customValue: e.target.value })}
+                                                className="w-14 pixel-box-sm p-1 text-[10px] text-black text-center"
+                                            />
+                                            <div className="flex gap-1 flex-1">
+                                                {['days', 'weeks'].map(u => (
+                                                    <button
+                                                        key={u}
+                                                        type="button"
+                                                        onClick={() => setEditForm({ ...editForm, customUnit: u })}
+                                                        className={`flex-1 pixel-box-sm py-1 text-[9px] active:scale-95 ${editForm.customUnit === u ? 'bg-purple-400 text-white' : 'bg-gray-200 text-black'}`}
+                                                    >
+                                                        {u.toUpperCase()}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setEditForm({ ...editForm, isBoss: !editForm.isBoss })}
+                                    className={`w-full mb-6 pixel-box-sm py-2 text-[10px] active:scale-95 flex items-center justify-center gap-2 ${editForm.isBoss ? 'bg-red-500 text-white' : 'bg-gray-200 text-black'}`}
+                                >
+                                    👑 {editForm.isBoss ? 'BOSS QUEST — +100XP / +25G' : 'MARK AS BOSS QUEST'}
+                                </button>
+
+                                <select
+                                    value={editForm.boardId}
+                                    onChange={(e) => setEditForm({ ...editForm, boardId: e.target.value })}
+                                    className="w-full pixel-box-sm p-3 text-[10px] mb-6 bg-white text-black"
+                                >
+                                    {boards.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                </select>
+
+                                <div className="flex gap-3">
+                                    <button type="button" onClick={closeEditTask} className="flex-1 pixel-box-sm py-3 text-xs bg-gray-300 text-black active:scale-95">CANCEL</button>
+                                    <button type="button" onClick={saveTaskEdit} className="flex-1 pixel-box-sm py-3 text-xs bg-green-500 text-white active:scale-95">SAVE CHANGES</button>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -1981,10 +2196,11 @@
                 const isOverdue = task.dueDate && task.dueDate < getTodayStr() && task.status !== 'done';
                 const isDone = task.status === 'done';
                 const isBeingDragged = dragState && dragState.taskId === task.id;
+                const isHolding = holdingTaskId === task.id;
                 
                 return (
                     <div 
-                        className={`pixel-box p-3 relative group transition-opacity ${isDone ? 'opacity-70' : 'bg-white text-black'} ${isBeingDragged ? 'opacity-30' : ''}`} 
+                        className={`pixel-box p-3 relative group transition-opacity ${isDone ? 'opacity-70' : 'bg-white text-black'} ${isBeingDragged ? 'opacity-30' : ''} ${isHolding ? 'animate-hold-pulse' : ''}`} 
                         style={{ backgroundColor: isDone ? activeTheme.tagBg : activeTheme.windowBg, cursor: isDone ? 'default' : 'grab' }}
                         onPointerDown={(e) => !isDone && handleCardPointerDown(e, task)}
                     >
@@ -2007,7 +2223,10 @@
                             </button>
                             
                             <div className="flex-1 min-w-0">
-                                <p className={`font-readable text-[13px] mb-2 break-words leading-snug ${isDone ? 'line-through opacity-70' : ''}`}>
+                                <p 
+                                    onClick={(e) => { e.stopPropagation(); if (!isDone && !justDraggedRef.current) openEditTask(task); }}
+                                    className={`font-readable text-[13px] mb-2 break-words leading-snug ${isDone ? 'line-through opacity-70' : 'cursor-pointer'}`}
+                                >
                                     {task.text}
                                 </p>
                                 
@@ -2029,7 +2248,15 @@
                                 )}
                                 
                                 <div className="flex flex-wrap gap-2 items-center">
-                                    <span className="bg-yellow-200 text-black px-1.5 py-0.5 pixel-box-sm text-[8px]">+50XP</span>
+                                    <span className="bg-yellow-200 text-black px-1.5 py-0.5 pixel-box-sm text-[8px]">
+                                        +{calculateTaskReward(task).xp}XP +{calculateTaskReward(task).gold}G
+                                    </span>
+
+                                    {task.isBoss && (
+                                        <span className="px-1.5 py-0.5 pixel-box-sm text-[8px] bg-red-500 text-white">
+                                            👑 BOSS
+                                        </span>
+                                    )}
                                     
                                     {isDone && task.completedAt && (
                                         <span className="px-1.5 py-0.5 pixel-box-sm text-[8px] bg-green-200 text-black">
@@ -2046,6 +2273,12 @@
                                     {task.recurrence && !isDone && (
                                         <span className="px-1.5 py-0.5 pixel-box-sm text-[8px] bg-purple-200 text-black">
                                             🔁 {task.recurrence.type === 'daily' ? 'DAILY' : task.recurrence.type === 'weekly' ? 'WEEKLY' : `EVERY ${task.recurrence.value}${task.recurrence.unit === 'weeks' ? 'W' : 'D'}`}
+                                        </span>
+                                    )}
+
+                                    {task.recurrence && task.streak > 0 && !isDone && (
+                                        <span className="px-1.5 py-0.5 pixel-box-sm text-[8px] bg-orange-200 text-black">
+                                            🔥 {task.streak}-STREAK
                                         </span>
                                     )}
 
