@@ -432,10 +432,11 @@
             };
 
             const handleToggleTaskStatus = (task) => {
+                if (task.status === 'done') return; // Prevent reverting from 'done'
+
                 let nextStatus = 'doing';
                 if (task.status === 'todo') nextStatus = 'doing';
                 else if (task.status === 'doing') nextStatus = 'done';
-                else if (task.status === 'done') nextStatus = 'todo';
 
                 setTasks(tasks.map(t => {
                     if (t.id === task.id) {
@@ -1159,8 +1160,9 @@
 
                         <div className="flex items-start gap-3">
                             <button 
-                                onClick={() => handleToggleTaskStatus(task)}
-                                className={`w-6 h-6 flex-shrink-0 pixel-box-sm flex items-center justify-center text-xs active:scale-90 mt-0.5 ${isDone ? 'bg-black text-white' : 'bg-white'}`}
+                                onClick={() => !isDone && handleToggleTaskStatus(task)}
+                                disabled={isDone}
+                                className={`w-6 h-6 flex-shrink-0 pixel-box-sm flex items-center justify-center text-xs mt-0.5 ${isDone ? 'bg-black text-white cursor-default' : 'bg-white active:scale-90'}`}
                             >
                                 {task.status === 'doing' ? 'O' : task.status === 'done' ? 'X' : ''}
                             </button>
@@ -1175,8 +1177,9 @@
                                         {task.subtasks.map((sub, idx) => (
                                             <div key={sub.id} className="flex items-center gap-2">
                                                 <button
-                                                    onClick={(e) => { e.stopPropagation(); handleToggleSubtask(task.id, idx); }}
-                                                    className={`w-3.5 h-3.5 flex-shrink-0 pixel-box-sm flex items-center justify-center ${sub.done ? 'bg-green-500 text-white' : 'bg-white'}`}
+                                                    onClick={(e) => { e.stopPropagation(); !isDone && handleToggleSubtask(task.id, idx); }}
+                                                    disabled={isDone}
+                                                    className={`w-3.5 h-3.5 flex-shrink-0 pixel-box-sm flex items-center justify-center ${sub.done ? 'bg-green-500 text-white' : 'bg-white'} ${isDone ? 'cursor-default opacity-70' : ''}`}
                                                 >
                                                     {sub.done && <span className="text-[8px] leading-none">X</span>}
                                                 </button>
