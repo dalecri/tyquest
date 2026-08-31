@@ -139,7 +139,6 @@
 
         // Layout constants for the activity heatmap's dynamic band-reflow (see activityLayout memo)
         const ACTIVITY_GAP = 2;
-        const ACTIVITY_DAY_LABEL_W = 16;
         const ACTIVITY_MONTH_LABEL_H = 11;
         const ACTIVITY_BAND_GAP = 8;
 
@@ -472,6 +471,7 @@
             // Custom pointer-based drag state (replaces native HTML5 DnD, which is unreliable on touch)
             const [dragState, setDragState] = useState(null); // { taskId, x, y, offsetX, offsetY, width, hoverColId }
             const dragCandidateRef = useRef(null); // pending drag before the hold threshold clears
+            const dragScrollTargetRef = useRef(null); // last column auto-scrolled to during an edge-drag, so we don't re-trigger every tick
             const activityContainerRef = useRef(null);
             const dragTimerRef = useRef(null);
 
@@ -813,13 +813,38 @@
                     }
 
                     e.preventDefault();
-                    const el = document.elementFromPoint(e.clientX, e.clientY);
-                    const colEl = el && el.closest('[data-colid]');
-                    setDragState(prev => prev ? { ...prev, x: e.clientX, y: e.clientY, hoverColId: colEl ? colEl.dataset.colid : prev.hoverColId } : prev);
+
+                    const order = ['todo', 'doing', 'done'];
+                    const baseColId = dragState.hoverColId || dragState.sourceStatus;
+                    const currentIdx = order.indexOf(baseColId);
+                    const EDGE_ZONE = 60; // px from the screen edge that counts as "aim for the next column"
+
+                    let targetColId;
+                    if (e.clientX <= EDGE_ZONE && currentIdx > 0) {
+                        targetColId = order[currentIdx - 1];
+                        if (dragScrollTargetRef.current !== targetColId) {
+                            dragScrollTargetRef.current = targetColId;
+                            document.querySelector(`[data-colid="${targetColId}"]`)?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        }
+                    } else if (e.clientX >= window.innerWidth - EDGE_ZONE && currentIdx !== -1 && currentIdx < order.length - 1) {
+                        targetColId = order[currentIdx + 1];
+                        if (dragScrollTargetRef.current !== targetColId) {
+                            dragScrollTargetRef.current = targetColId;
+                            document.querySelector(`[data-colid="${targetColId}"]`)?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                        }
+                    } else {
+                        dragScrollTargetRef.current = null;
+                        const el = document.elementFromPoint(e.clientX, e.clientY);
+                        const colEl = el && el.closest('[data-colid]');
+                        targetColId = colEl ? colEl.dataset.colid : baseColId;
+                    }
+
+                    setDragState(prev => prev ? { ...prev, x: e.clientX, y: e.clientY, hoverColId: targetColId || prev.hoverColId } : prev);
                 };
 
                 const handleUp = () => {
                     clearTimeout(dragTimerRef.current);
+                    dragScrollTargetRef.current = null;
                     setDragState(prev => {
                         if (prev) {
                             const task = tasks.find(t => t.id === prev.taskId);
@@ -982,7 +1007,7 @@
                 const { width, height } = activitySize;
                 if (!width || !height) return { bands: 1, weeksPerBand: totalWeeks, cellSize: 5 };
 
-                const availW = Math.max(width - ACTIVITY_DAY_LABEL_W - ACTIVITY_GAP, 20);
+                const availW = Math.max(width, 20);
                 const availH = Math.max(height, 20);
 
                 let best = { bands: 1, weeksPerBand: totalWeeks, cellSize: 0 };
@@ -1468,34 +1493,27 @@
 
                                 <div ref={activityContainerRef} className="flex-1 min-h-0 flex flex-col justify-center overflow-hidden" style={{ gap: `${ACTIVITY_BAND_GAP}px` }}>
                                     {activityBands.map((bandWeeks, bandIndex) => (
-                                        <div key={bandIndex} className="flex flex-shrink-0" style={{ gap: `${ACTIVITY_GAP + 1}px` }}>
-                                            <div className="flex-shrink-0 flex flex-col justify-between" style={{ width: `${ACTIVITY_DAY_LABEL_W}px`, paddingTop: `${ACTIVITY_MONTH_LABEL_H}px` }}>
-                                                {['', 'Mon', '', 'Wed', '', 'Fri', ''].map((label, i) => (
-                                                    <div key={i} className="text-[6px] opacity-60 leading-none" style={{ height: `${activityLayout.cellSize}px`, color: activeTheme.border }}>{label}</div>
+                                        <div key={bandIndex} className="flex-shrink-0">
+                                            <div className="flex" style={{ gap: `${ACTIVITY_GAP}px`, height: `${ACTIVITY_MONTH_LABEL_H}px` }}>
+                                                {bandWeeks.map((week, wi) => (
+                                                    <div key={wi} className="text-[6px] opacity-60 truncate leading-none" style={{ width: `${activityLayout.cellSize}px`, color: activeTheme.border }}>
+                                                        {activityMonthLabel(week, wi > 0 ? bandWeeks[wi - 1] : null)}
+                                                    </div>
                                                 ))}
                                             </div>
-                                            <div>
-                                                <div className="flex" style={{ gap: `${ACTIVITY_GAP}px`, height: `${ACTIVITY_MONTH_LABEL_H}px` }}>
-                                                    {bandWeeks.map((week, wi) => (
-                                                        <div key={wi} className="text-[6px] opacity-60 truncate leading-none" style={{ width: `${activityLayout.cellSize}px`, color: activeTheme.border }}>
-                                                            {activityMonthLabel(week, wi > 0 ? bandWeeks[wi - 1] : null)}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                <div className="flex" style={{ gap: `${ACTIVITY_GAP}px` }}>
-                                                    {bandWeeks.map((week, wi) => (
-                                                        <div key={wi} className="flex flex-col" style={{ gap: `${ACTIVITY_GAP}px` }}>
-                                                            {week.map((day, di) => (
-                                                                <div
-                                                                    key={di}
-                                                                    title={day ? `${day.date}: ${day.count} completed` : ''}
-                                                                    className="rounded-sm"
-                                                                    style={{ width: `${activityLayout.cellSize}px`, height: `${activityLayout.cellSize}px`, ...(day ? activityIntensityStyle(day.count) : { backgroundColor: 'transparent' }) }}
-                                                                ></div>
-                                                            ))}
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                            <div className="flex" style={{ gap: `${ACTIVITY_GAP}px` }}>
+                                                {bandWeeks.map((week, wi) => (
+                                                    <div key={wi} className="flex flex-col" style={{ gap: `${ACTIVITY_GAP}px` }}>
+                                                        {week.map((day, di) => (
+                                                            <div
+                                                                key={di}
+                                                                title={day ? `${day.date}: ${day.count} completed` : ''}
+                                                                className="rounded-sm"
+                                                                style={{ width: `${activityLayout.cellSize}px`, height: `${activityLayout.cellSize}px`, ...(day ? activityIntensityStyle(day.count) : { backgroundColor: 'transparent' }) }}
+                                                            ></div>
+                                                        ))}
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     ))}
