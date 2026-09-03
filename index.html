@@ -149,7 +149,7 @@
         const ACTIVITY_MONTH_LABEL_H = 11;
         const ACTIVITY_BAND_GAP = 8;
 
-        const NAV_TITLES = { board: 'Kanban', list: 'List', archive: 'My Archive' };
+        const NAV_TITLES = { archive: 'Encyclopedia' }; // 'tasks' section title is computed from taskViewMode instead
 
         const RETRO_THEMES = {
             snes16bit: {
@@ -419,7 +419,8 @@
             const [libraryItems, setLibraryItems] = useState([]);
             const [activeLibCat, setActiveLibCat] = useState('all');
 
-            const [activeTab, setActiveTab] = useState('board'); 
+            const [activeTab, setActiveTab] = useState('tasks'); // 'tasks' | 'archive' — Kanban/List are now one page, toggled via taskViewMode
+            const [taskViewMode, setTaskViewMode] = useState('kanban'); // 'kanban' | 'list'
             
             const [xp, setXp] = useState(0);
             const [level, setLevel] = useState(1);
@@ -1197,13 +1198,23 @@
                                         <HeroAvatar />
                                     </button>
                                     <div>
-                                        <h1 className="text-sm leading-tight">{NAV_TITLES[activeTab] || characterName}</h1>
+                                        <h1 className="text-sm leading-tight">{activeTab === 'archive' ? NAV_TITLES.archive : (taskViewMode === 'kanban' ? 'Kanban' : 'List')}</h1>
                                         <p className="text-[10px] opacity-80">LVL {level}</p>
                                     </div>
                                 </div>
 
                                 <div className="flex items-center gap-4">
                                     <div className="flex items-center gap-1.5 px-2">
+                                        {activeTab === 'tasks' && (
+                                            <button
+                                                onClick={() => { sound.playBlip(); setTaskViewMode(taskViewMode === 'kanban' ? 'list' : 'kanban'); }}
+                                                className="p-1 active:scale-95 mr-1"
+                                                style={{ color: activeTheme.hudText }}
+                                                title="Toggle Kanban/List view"
+                                            >
+                                                {taskViewMode === 'kanban' ? <IconList active={false} /> : <IconBoard active={false} />}
+                                            </button>
+                                        )}
                                         <GoldBadge amount={Number.isNaN(gold) ? 0 : gold} />
                                     </div>
                                 </div>
@@ -1224,7 +1235,7 @@
                                 </button>
                             )}
 
-                            {(activeTab === 'board' || activeTab === 'list') && (
+                            {activeTab === 'tasks' && (
                                 <div className="flex overflow-x-auto hide-scrollbar px-2 py-2 gap-2 items-center flex-1">
                                     {boards.map(b => (
                                         <div key={b.id} className="flex items-center">
@@ -1302,7 +1313,7 @@
                     {}
                     <main className="flex-1 overflow-hidden relative flex flex-col min-h-0 h-full">
                         
-                        {activeTab === 'board' && (
+                        {activeTab === 'tasks' && taskViewMode === 'kanban' && (
                             <div className="flex-1 overflow-x-auto snap-x snap-mandatory hide-scrollbar p-4 flex gap-4 items-start h-full pb-8">
                                 {['todo', 'doing', 'done'].map(colId => {
                                     const colTasks = filteredTasks.filter(t => t.status === colId);
@@ -1354,7 +1365,7 @@
                             </div>
                         )}
 
-                        {activeTab === 'list' && (
+                        {activeTab === 'tasks' && taskViewMode === 'list' && (
                             <div className="flex-1 overflow-x-auto snap-x snap-mandatory hide-scrollbar p-4 flex gap-4 items-start h-full pb-8">
                                 <div className="w-[100%] max-w-[500px] h-full mx-auto flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden" style={{ backgroundColor: activeTheme.windowBg }}>
                                     
@@ -1402,26 +1413,7 @@
                             <div className="flex-1 overflow-x-auto snap-x snap-mandatory hide-scrollbar p-4 flex gap-4 items-start h-full pb-8">
                                 <div className="w-[100%] max-w-[500px] md:max-w-[720px] lg:max-w-[960px] h-full mx-auto flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden" style={{ backgroundColor: activeTheme.windowBg }}>
                                     
-                                    <div className="p-3 border-b-4 sticky top-0 z-10 backdrop-blur-sm bg-white/50" style={{ borderColor: activeTheme.border }}>
-                                        <form onSubmit={(e) => {
-                                            e.preventDefault();
-                                            const txt = e.target.itemText.value.trim();
-                                            if(txt) {
-                                                handleAddLibraryItem(txt, activeLibCat);
-                                                e.target.reset();
-                                            }
-                                        }} className="flex gap-2">
-                                            <input 
-                                                type="text" 
-                                                name="itemText" 
-                                                placeholder="Add to archive..." 
-                                                className="font-readable flex-1 pixel-box-sm p-2 text-[13px] text-black focus:outline-none" 
-                                            />
-                                            <button type="submit" className="pixel-box-sm bg-green-500 text-white px-3 text-xs active:scale-95">+</button>
-                                        </form>
-                                    </div>
-                                    
-                                    <div className="p-4 overflow-y-auto hide-scrollbar flex-1 pb-safe grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 content-start">
+                                    <div className="p-4 overflow-y-auto hide-scrollbar flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 content-start">
                                         {filteredLibItems.length === 0 && (
                                             <div className="col-span-full text-center opacity-50 text-[10px] py-8 text-black">
                                                 NO ITEMS SAVED
@@ -1456,6 +1448,25 @@
                                         })}
                                     </div>
 
+                                    <div className="p-3 border-t-4 sticky bottom-0 z-10 backdrop-blur-sm bg-white/50 pb-safe" style={{ borderColor: activeTheme.border }}>
+                                        <form onSubmit={(e) => {
+                                            e.preventDefault();
+                                            const txt = e.target.itemText.value.trim();
+                                            if(txt) {
+                                                handleAddLibraryItem(txt, activeLibCat);
+                                                e.target.reset();
+                                            }
+                                        }} className="flex gap-2">
+                                            <input 
+                                                type="text" 
+                                                name="itemText" 
+                                                placeholder="Add to encyclopedia..." 
+                                                className="font-readable flex-1 pixel-box-sm p-2 text-[13px] text-black focus:outline-none" 
+                                            />
+                                            <button type="submit" className="pixel-box-sm bg-green-500 text-white px-3 text-xs active:scale-95">+</button>
+                                        </form>
+                                    </div>
+
                                 </div>
                             </div>
                         )}
@@ -1465,11 +1476,10 @@
                     {/* --- BOTTOM NAV DOCK (always available, independent of the header's collapse state) --- */}
                     <nav 
                         className="flex-shrink-0 flex items-stretch pb-safe z-20" 
-                        style={{ backgroundColor: activeTheme.hudBg, borderTop: `4px solid ${activeTheme.border}` }}
+                        style={{ backgroundColor: activeTheme.hudBg, borderTop: `4px solid ${activeTheme.border}`, minHeight: '55px' }}
                     >
                         {[
-                            { id: 'board', Icon: IconBoard },
-                            { id: 'list', Icon: IconList },
+                            { id: 'tasks', Icon: IconBoard },
                             { id: 'archive', Icon: IconArchive }
                         ].map(tab => (
                             <button
