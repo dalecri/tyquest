@@ -411,12 +411,12 @@
 
         // Encyclopedia list-item markers — a list isn't always a checklist, so each category can
         // pick its own style: a checkbox, a colored dot, an auto-numbered badge, or a star.
-        const MARKER_STYLES = ['check', 'number', 'emoji'];
-        const MARKER_STYLE_ICONS = { check: '✓', number: '①', emoji: '⭐' };
+        const MARKER_STYLES = ['check', 'number', 'emoji', 'none'];
+        const MARKER_STYLE_ICONS = { check: '✓', number: '①', emoji: '⭐', none: '—' };
 
         const initialLibraryItems = [
-            { id: 'l1', text: 'Stardew Valley 1.6 Update', categoryId: 'games', done: false },
-            { id: 'l2', text: 'Dune Messiah', categoryId: 'books', done: false }
+            { id: 'l1', title: 'Stardew Valley 1.6 Update', description: '', categoryId: 'games', done: false },
+            { id: 'l2', title: 'Dune Messiah', description: '', categoryId: 'books', done: false }
         ];
 
         function App() {
@@ -429,8 +429,11 @@
             const [libraryCategories, setLibraryCategories] = useState([]);
             const [libraryItems, setLibraryItems] = useState([]);
             const [activeLibCat, setActiveLibCat] = useState('all');
-            const [editingLibItemId, setEditingLibItemId] = useState(null);
-            const [libItemEditText, setLibItemEditText] = useState('');
+            const [editingLibField, setEditingLibField] = useState(null); // { itemId, field: 'title' | 'description' }
+            const [libFieldDraft, setLibFieldDraft] = useState('');
+            const [showNoteSheet, setShowNoteSheet] = useState(false);
+            const [noteTitle, setNoteTitle] = useState('');
+            const [noteDescription, setNoteDescription] = useState('');
 
             const [activeTab, setActiveTab] = useState('tasks'); // 'tasks' | 'archive' — Kanban/List are now one page, toggled via taskViewMode
             const [taskViewMode, setTaskViewMode] = useState('kanban'); // 'kanban' | 'list'
@@ -485,6 +488,13 @@
                     setQuestIsBoss(false);
                 }
             }, [isAddingQuest]);
+
+            useEffect(() => {
+                if (showNoteSheet) {
+                    setNoteTitle('');
+                    setNoteDescription('');
+                }
+            }, [showNoteSheet]);
 
             // Turns a repeat-picker choice into the { type, intervalDays } shape stored on the task —
             // pulled out as a pure function so both the New Quest form and the Edit Quest form can use it.
@@ -1023,16 +1033,19 @@
                 sound.playError();
             };
 
-            const handleAddLibraryItem = (text, categoryId) => {
-                if(!text) return;
+            const saveNoteEntry = () => {
+                const title = noteTitle.trim();
+                if (!title) return;
                 const newItem = {
-                    id: 'l_'+Date.now(),
-                    text,
-                    categoryId: categoryId === 'all' ? (libraryCategories[1]?.id || 'misc') : categoryId,
+                    id: 'l_' + Date.now(),
+                    title,
+                    description: noteDescription.trim().slice(0, 350),
+                    categoryId: activeLibCat === 'all' ? (libraryCategories[1]?.id || 'misc') : activeLibCat,
                     done: false
                 };
                 setLibraryItems([newItem, ...libraryItems]);
                 sound.playBlip(600);
+                setShowNoteSheet(false);
             };
 
             const handleToggleLibraryItem = (itemId) => {
@@ -1052,6 +1065,7 @@
             const renderLibraryMarker = (item, cat) => {
                 const style = cat?.markerStyle || 'check';
                 const base = "flex-shrink-0 active:scale-90";
+                if (style === 'none') return null;
                 if (style === 'number') {
                     const itemsInCat = libraryItems.filter(i => i.categoryId === item.categoryId);
                     const idx = itemsInCat.findIndex(i => i.id === item.id) + 1;
@@ -1089,17 +1103,18 @@
                 sound.playError();
             };
 
-            const openLibItemEdit = (item) => {
-                setEditingLibItemId(item.id);
-                setLibItemEditText(item.text);
+            const openLibFieldEdit = (item, field) => {
+                setEditingLibField({ itemId: item.id, field });
+                setLibFieldDraft(field === 'title' ? (item.title || item.text || '') : (item.description || ''));
             };
 
-            const saveLibItemEdit = () => {
-                const text = libItemEditText.trim();
-                if (text) {
-                    setLibraryItems(prev => prev.map(i => i.id === editingLibItemId ? { ...i, text } : i));
-                }
-                setEditingLibItemId(null);
+            const saveLibFieldEdit = () => {
+                if (!editingLibField) return;
+                const { itemId, field } = editingLibField;
+                const value = field === 'description' ? libFieldDraft.trim().slice(0, 350) : libFieldDraft.trim();
+                if (field === 'title' && !value) { setEditingLibField(null); return; } // titles can't be blanked out
+                setLibraryItems(prev => prev.map(i => i.id === itemId ? { ...i, [field]: value } : i));
+                setEditingLibField(null);
             };
 
             const handleDeleteLibCategory = (id) => {
@@ -1465,7 +1480,7 @@
                             <div className="flex-1 overflow-x-auto snap-x snap-mandatory hide-scrollbar p-4 flex gap-4 items-start h-full pb-8">
                                 <div className="w-[100%] max-w-[500px] md:max-w-[720px] lg:max-w-[960px] h-full mx-auto flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden" style={{ backgroundColor: activeTheme.windowBg }}>
                                     
-                                    <div className="overflow-y-auto hide-scrollbar flex-1">
+                                    <div className="overflow-y-auto hide-scrollbar flex-1 pb-20">
                                         {filteredLibItems.length === 0 && (
                                             <div className="text-center opacity-50 text-[10px] py-8 text-black">
                                                 NO ITEMS SAVED
@@ -1473,7 +1488,8 @@
                                         )}
                                         {filteredLibItems.map((item, idx) => {
                                             const cat = libraryCategories.find(c => c.id === item.categoryId);
-                                            const isEditingThis = editingLibItemId === item.id;
+                                            const editingTitle = editingLibField?.itemId === item.id && editingLibField.field === 'title';
+                                            const editingDesc = editingLibField?.itemId === item.id && editingLibField.field === 'description';
                                             return (
                                                 <div 
                                                     key={item.id} 
@@ -1483,28 +1499,52 @@
                                                     <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
                                                         {renderLibraryMarker(item, cat)}
                                                         <div className="flex-1 min-w-0">
-                                                            {isEditingThis ? (
+                                                            {editingTitle ? (
                                                                 <input
                                                                     type="text"
                                                                     autoFocus
-                                                                    value={libItemEditText}
-                                                                    onChange={(e) => setLibItemEditText(e.target.value)}
-                                                                    onBlur={saveLibItemEdit}
+                                                                    value={libFieldDraft}
+                                                                    onChange={(e) => setLibFieldDraft(e.target.value)}
+                                                                    onBlur={saveLibFieldEdit}
                                                                     onKeyDown={(e) => {
-                                                                        if (e.key === 'Enter') saveLibItemEdit();
-                                                                        if (e.key === 'Escape') setEditingLibItemId(null);
+                                                                        if (e.key === 'Enter') saveLibFieldEdit();
+                                                                        if (e.key === 'Escape') setEditingLibField(null);
                                                                     }}
-                                                                    className="font-readable text-[13px] leading-snug w-full bg-transparent border-b-2 focus:outline-none text-black"
+                                                                    className="font-readable text-[13px] font-bold leading-snug w-full bg-transparent border-b-2 focus:outline-none text-black"
                                                                     style={{ borderColor: activeTheme.primary }}
                                                                 />
                                                             ) : (
                                                                 <div 
-                                                                    onClick={() => !item.done && openLibItemEdit(item)}
-                                                                    className={`font-readable text-[13px] leading-snug break-words text-black ${item.done ? 'line-through opacity-60' : 'cursor-pointer'}`}
+                                                                    onClick={() => !item.done && openLibFieldEdit(item, 'title')}
+                                                                    className={`font-readable text-[13px] font-bold leading-snug break-words text-black ${item.done ? 'line-through opacity-60' : 'cursor-pointer'}`}
                                                                 >
-                                                                    {item.text}
+                                                                    {item.title || item.text}
                                                                 </div>
                                                             )}
+
+                                                            {editingDesc ? (
+                                                                <textarea
+                                                                    autoFocus
+                                                                    rows={2}
+                                                                    maxLength={350}
+                                                                    value={libFieldDraft}
+                                                                    onChange={(e) => setLibFieldDraft(e.target.value.slice(0, 350))}
+                                                                    onBlur={saveLibFieldEdit}
+                                                                    onKeyDown={(e) => { if (e.key === 'Escape') setEditingLibField(null); }}
+                                                                    className="font-readable text-[12px] leading-snug w-full bg-transparent border-b-2 focus:outline-none resize-none mt-1 text-gray-500"
+                                                                    style={{ borderColor: activeTheme.primary }}
+                                                                ></textarea>
+                                                            ) : (
+                                                                (item.description || !item.done) && (
+                                                                    <div 
+                                                                        onClick={() => !item.done && openLibFieldEdit(item, 'description')}
+                                                                        className={`font-readable text-[12px] leading-snug break-words mt-0.5 text-gray-500 ${item.done ? '' : 'cursor-pointer'}`}
+                                                                    >
+                                                                        {item.description || '+ add description'}
+                                                                    </div>
+                                                                )
+                                                            )}
+
                                                             {activeLibCat === 'all' && cat && (
                                                                 <div className="text-[8px] opacity-60 mt-1 text-black">{cat.emoji} {cat.name}</div>
                                                             )}
@@ -1521,31 +1561,20 @@
                                         })}
                                     </div>
 
-                                    <div className="flex items-stretch sticky bottom-0 z-10 backdrop-blur-sm bg-white/50 pb-safe border-t-4" style={{ borderColor: activeTheme.border }}>
-                                        <form onSubmit={(e) => {
-                                            e.preventDefault();
-                                            const txt = e.target.itemText.value.trim();
-                                            if(txt) {
-                                                handleAddLibraryItem(txt, activeLibCat);
-                                                e.target.reset();
-                                            }
-                                        }} className="flex items-stretch flex-1">
-                                            <input 
-                                                type="text" 
-                                                name="itemText" 
-                                                placeholder="Add to encyclopedia..." 
-                                                className="font-readable flex-1 min-w-0 px-4 py-3 text-[13px] text-black bg-transparent focus:outline-none" 
-                                            />
-                                            <div className="w-[2px] flex-shrink-0" style={{ backgroundColor: activeTheme.border }}></div>
-                                            <button 
-                                                type="submit" 
-                                                className="px-5 flex-shrink-0 flex items-center justify-center text-white text-xl font-bold active:opacity-75"
-                                                style={{ backgroundColor: activeTheme.primary }}
-                                            >
-                                                +
-                                            </button>
-                                        </form>
-                                    </div>
+                                    <button
+                                        onClick={() => { sound.playBlip(); setShowNoteSheet(true); }}
+                                        className="absolute w-14 h-14 rounded-full flex items-center justify-center text-white text-3xl font-bold active:scale-90 z-20"
+                                        style={{ 
+                                            backgroundColor: activeTheme.primary, 
+                                            border: `3px solid ${activeTheme.border}`,
+                                            boxShadow: '3px 3px 0px rgba(0,0,0,0.3)',
+                                            right: '1.25rem',
+                                            bottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))'
+                                        }}
+                                        title="New entry"
+                                    >
+                                        +
+                                    </button>
 
                                 </div>
                             </div>
@@ -1572,6 +1601,46 @@
                             </button>
                         ))}
                     </nav>
+
+                    {/* --- NEW ENCYCLOPEDIA ENTRY (bottom sheet, ~half height, opened via the floating + button) --- */}
+                    {showNoteSheet && (
+                        <div className="fixed inset-0 z-[70] flex flex-col justify-end">
+                            <div className="absolute inset-0 bg-black/50" onClick={() => setShowNoteSheet(false)}></div>
+                            <div 
+                                className="relative pixel-box p-5 animate-slide-up-in flex flex-col"
+                                style={{ backgroundColor: activeTheme.windowBg, borderColor: activeTheme.border, height: '50vh', borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }}
+                            >
+                                <h3 className="text-sm mb-4 text-black">NEW ENTRY</h3>
+                                <input
+                                    type="text"
+                                    autoFocus
+                                    value={noteTitle}
+                                    onChange={(e) => setNoteTitle(e.target.value)}
+                                    placeholder="Title"
+                                    className="font-readable w-full text-[15px] font-bold text-black bg-transparent border-b-2 pb-2 mb-3 focus:outline-none"
+                                    style={{ borderColor: activeTheme.border }}
+                                />
+                                <textarea
+                                    value={noteDescription}
+                                    onChange={(e) => setNoteDescription(e.target.value.slice(0, 350))}
+                                    maxLength={350}
+                                    placeholder="Description (optional)"
+                                    className="font-readable w-full text-[13px] text-gray-500 bg-transparent focus:outline-none resize-none flex-1"
+                                ></textarea>
+                                <div className="text-[9px] text-right opacity-50 mb-3 text-black">{noteDescription.length}/350</div>
+                                <div className="flex gap-3 pb-safe">
+                                    <button onClick={() => setShowNoteSheet(false)} className="flex-1 pixel-box-sm py-3 text-xs bg-gray-300 text-black active:scale-95">CANCEL</button>
+                                    <button 
+                                        onClick={saveNoteEntry} 
+                                        disabled={!noteTitle.trim()}
+                                        className={`flex-1 pixel-box-sm py-3 text-xs bg-green-500 text-white active:scale-95 ${!noteTitle.trim() ? 'opacity-50' : ''}`}
+                                    >
+                                        SAVE
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* --- TAVERN OVERLAY (slides down like a shop shutter, separate from the main tabs) --- */}
                     {showTavern && (
