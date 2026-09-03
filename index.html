@@ -405,9 +405,14 @@
 
         const initialLibraryCategories = [
             { id: 'all', name: 'ALL', emoji: '📚' },
-            { id: 'games', name: 'GAMES TO PLAY', emoji: '🎮' },
-            { id: 'books', name: 'BOOKS TO READ', emoji: '📖' }
+            { id: 'games', name: 'GAMES TO PLAY', emoji: '🎮', markerStyle: 'check' },
+            { id: 'books', name: 'BOOKS TO READ', emoji: '📖', markerStyle: 'check' }
         ];
+
+        // Encyclopedia list-item markers — a list isn't always a checklist, so each category can
+        // pick its own style: a checkbox, a colored dot, an auto-numbered badge, or a star.
+        const MARKER_STYLES = ['check', 'number', 'emoji'];
+        const MARKER_STYLE_ICONS = { check: '✓', number: '①', emoji: '⭐' };
 
         const initialLibraryItems = [
             { id: 'l1', text: 'Stardew Valley 1.6 Update', categoryId: 'games', done: false },
@@ -424,6 +429,8 @@
             const [libraryCategories, setLibraryCategories] = useState([]);
             const [libraryItems, setLibraryItems] = useState([]);
             const [activeLibCat, setActiveLibCat] = useState('all');
+            const [editingLibItemId, setEditingLibItemId] = useState(null);
+            const [libItemEditText, setLibItemEditText] = useState('');
 
             const [activeTab, setActiveTab] = useState('tasks'); // 'tasks' | 'archive' — Kanban/List are now one page, toggled via taskViewMode
             const [taskViewMode, setTaskViewMode] = useState('kanban'); // 'kanban' | 'list'
@@ -1033,9 +1040,66 @@
                 sound.playBlip(650);
             };
 
+            const cycleCategoryMarkerStyle = (catId) => {
+                setLibraryCategories(prev => prev.map(c => {
+                    if (c.id !== catId) return c;
+                    const currentIdx = MARKER_STYLES.indexOf(c.markerStyle || 'check');
+                    return { ...c, markerStyle: MARKER_STYLES[(currentIdx + 1) % MARKER_STYLES.length] };
+                }));
+                sound.playBlip(500);
+            };
+
+            const renderLibraryMarker = (item, cat) => {
+                const style = cat?.markerStyle || 'check';
+                const base = "flex-shrink-0 active:scale-90";
+                if (style === 'number') {
+                    const itemsInCat = libraryItems.filter(i => i.categoryId === item.categoryId);
+                    const idx = itemsInCat.findIndex(i => i.id === item.id) + 1;
+                    return (
+                        <button
+                            onClick={() => handleToggleLibraryItem(item.id)}
+                            className={`${base} w-5 h-5 pixel-box-sm flex items-center justify-center text-[9px] font-arcade ${item.done ? 'bg-green-500 text-white' : 'bg-white text-black'}`}
+                        >
+                            {idx}
+                        </button>
+                    );
+                }
+                if (style === 'emoji') {
+                    return (
+                        <button
+                            onClick={() => handleToggleLibraryItem(item.id)}
+                            className={`${base} text-base ${item.done ? '' : 'grayscale opacity-30'}`}
+                        >
+                            ⭐
+                        </button>
+                    );
+                }
+                return (
+                    <button 
+                        onClick={() => handleToggleLibraryItem(item.id)}
+                        className={`${base} w-5 h-5 pixel-box-sm flex items-center justify-center text-xs ${item.done ? 'bg-green-600 text-white font-bold' : 'bg-white'}`}
+                    >
+                        {item.done ? '✓' : ''}
+                    </button>
+                );
+            };
+
             const handleDeleteLibraryItem = (id) => {
                 setLibraryItems(libraryItems.filter(i => i.id !== id));
                 sound.playError();
+            };
+
+            const openLibItemEdit = (item) => {
+                setEditingLibItemId(item.id);
+                setLibItemEditText(item.text);
+            };
+
+            const saveLibItemEdit = () => {
+                const text = libItemEditText.trim();
+                if (text) {
+                    setLibraryItems(prev => prev.map(i => i.id === editingLibItemId ? { ...i, text } : i));
+                }
+                setEditingLibItemId(null);
             };
 
             const handleDeleteLibCategory = (id) => {
@@ -1401,27 +1465,48 @@
                             <div className="flex-1 overflow-x-auto snap-x snap-mandatory hide-scrollbar p-4 flex gap-4 items-start h-full pb-8">
                                 <div className="w-[100%] max-w-[500px] md:max-w-[720px] lg:max-w-[960px] h-full mx-auto flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden" style={{ backgroundColor: activeTheme.windowBg }}>
                                     
-                                    <div className="p-4 overflow-y-auto hide-scrollbar flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 content-start">
+                                    <div className="overflow-y-auto hide-scrollbar flex-1">
                                         {filteredLibItems.length === 0 && (
-                                            <div className="col-span-full text-center opacity-50 text-[10px] py-8 text-black">
+                                            <div className="text-center opacity-50 text-[10px] py-8 text-black">
                                                 NO ITEMS SAVED
                                             </div>
                                         )}
-                                        {filteredLibItems.map(item => {
+                                        {filteredLibItems.map((item, idx) => {
                                             const cat = libraryCategories.find(c => c.id === item.categoryId);
+                                            const isEditingThis = editingLibItemId === item.id;
                                             return (
-                                                <div key={item.id} className={`pixel-box-sm p-3 text-black flex justify-between items-center group transition-colors ${item.done ? 'bg-black/10 opacity-70' : 'bg-white/80'}`}>
+                                                <div 
+                                                    key={item.id} 
+                                                    className={`px-4 py-3 flex justify-between items-center group transition-colors ${idx > 0 ? 'border-t-2' : ''}`}
+                                                    style={{ borderColor: activeTheme.border }}
+                                                >
                                                     <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
-                                                        <button 
-                                                            onClick={() => handleToggleLibraryItem(item.id)}
-                                                            className={`w-5 h-5 flex-shrink-0 pixel-box-sm flex items-center justify-center text-xs active:scale-90 ${item.done ? 'bg-green-600 text-white font-bold' : 'bg-white'}`}
-                                                        >
-                                                            {item.done ? '✓' : ''}
-                                                        </button>
+                                                        {renderLibraryMarker(item, cat)}
                                                         <div className="flex-1 min-w-0">
-                                                            <div className={`font-readable text-[13px] leading-snug break-words ${item.done ? 'line-through opacity-60' : ''}`}>{item.text}</div>
+                                                            {isEditingThis ? (
+                                                                <input
+                                                                    type="text"
+                                                                    autoFocus
+                                                                    value={libItemEditText}
+                                                                    onChange={(e) => setLibItemEditText(e.target.value)}
+                                                                    onBlur={saveLibItemEdit}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') saveLibItemEdit();
+                                                                        if (e.key === 'Escape') setEditingLibItemId(null);
+                                                                    }}
+                                                                    className="font-readable text-[13px] leading-snug w-full bg-transparent border-b-2 focus:outline-none text-black"
+                                                                    style={{ borderColor: activeTheme.primary }}
+                                                                />
+                                                            ) : (
+                                                                <div 
+                                                                    onClick={() => !item.done && openLibItemEdit(item)}
+                                                                    className={`font-readable text-[13px] leading-snug break-words text-black ${item.done ? 'line-through opacity-60' : 'cursor-pointer'}`}
+                                                                >
+                                                                    {item.text}
+                                                                </div>
+                                                            )}
                                                             {activeLibCat === 'all' && cat && (
-                                                                <div className="text-[8px] opacity-60 mt-1">{cat.emoji} {cat.name}</div>
+                                                                <div className="text-[8px] opacity-60 mt-1 text-black">{cat.emoji} {cat.name}</div>
                                                             )}
                                                         </div>
                                                     </div>
@@ -1436,7 +1521,7 @@
                                         })}
                                     </div>
 
-                                    <div className="p-3 border-t-4 sticky bottom-0 z-10 backdrop-blur-sm bg-white/50 pb-safe" style={{ borderColor: activeTheme.border }}>
+                                    <div className="flex items-stretch sticky bottom-0 z-10 backdrop-blur-sm bg-white/50 pb-safe border-t-4" style={{ borderColor: activeTheme.border }}>
                                         <form onSubmit={(e) => {
                                             e.preventDefault();
                                             const txt = e.target.itemText.value.trim();
@@ -1444,14 +1529,21 @@
                                                 handleAddLibraryItem(txt, activeLibCat);
                                                 e.target.reset();
                                             }
-                                        }} className="flex gap-2">
+                                        }} className="flex items-stretch flex-1">
                                             <input 
                                                 type="text" 
                                                 name="itemText" 
                                                 placeholder="Add to encyclopedia..." 
-                                                className="font-readable flex-1 pixel-box-sm p-2 text-[13px] text-black focus:outline-none" 
+                                                className="font-readable flex-1 min-w-0 px-4 py-3 text-[13px] text-black bg-transparent focus:outline-none" 
                                             />
-                                            <button type="submit" className="pixel-box-sm bg-green-500 text-white px-3 text-xs active:scale-95">+</button>
+                                            <div className="w-[2px] flex-shrink-0" style={{ backgroundColor: activeTheme.border }}></div>
+                                            <button 
+                                                type="submit" 
+                                                className="px-5 flex-shrink-0 flex items-center justify-center text-white text-xl font-bold active:opacity-75"
+                                                style={{ backgroundColor: activeTheme.primary }}
+                                            >
+                                                +
+                                            </button>
                                         </form>
                                     </div>
 
@@ -1675,6 +1767,15 @@
                                             >
                                                 <span>{cat.emoji}</span> <span>{cat.name}</span>
                                             </button>
+                                            {cat.id !== 'all' && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); cycleCategoryMarkerStyle(cat.id); }}
+                                                    className="w-8 h-8 flex-shrink-0 pixel-box-sm flex items-center justify-center text-xs bg-white/60 text-black active:scale-90"
+                                                    title="Change how items in this list are marked"
+                                                >
+                                                    {MARKER_STYLE_ICONS[cat.markerStyle || 'check']}
+                                                </button>
+                                            )}
                                             {cat.id !== 'all' && activeLibCat === cat.id && (
                                                 <button
                                                     onClick={() => { sound.playBlip(); setDeleteConfirm({ show: true, type: 'libCat', id: cat.id, name: cat.name }); setShowEncyclopediaNav(false); }}
@@ -2231,7 +2332,8 @@
                                     const newCat = { 
                                         id: 'c_'+Date.now(), 
                                         name: fd.get('name').toUpperCase(),
-                                        emoji: fd.get('emoji') || '📝'
+                                        emoji: fd.get('emoji') || '📝',
+                                        markerStyle: 'check'
                                     };
                                     setLibraryCategories([...libraryCategories, newCat]);
                                     setActiveLibCat(newCat.id);
