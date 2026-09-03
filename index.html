@@ -1499,28 +1499,39 @@
                                                     <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
                                                         {renderLibraryMarker(item, cat)}
                                                         <div className="flex-1 min-w-0">
-                                                            {editingTitle ? (
-                                                                <input
-                                                                    type="text"
-                                                                    autoFocus
-                                                                    value={libFieldDraft}
-                                                                    onChange={(e) => setLibFieldDraft(e.target.value)}
-                                                                    onBlur={saveLibFieldEdit}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === 'Enter') saveLibFieldEdit();
-                                                                        if (e.key === 'Escape') setEditingLibField(null);
-                                                                    }}
-                                                                    className="font-readable text-[13px] font-bold leading-snug w-full bg-transparent border-b-2 focus:outline-none text-black"
-                                                                    style={{ borderColor: activeTheme.primary }}
-                                                                />
-                                                            ) : (
-                                                                <div 
-                                                                    onClick={() => !item.done && openLibFieldEdit(item, 'title')}
-                                                                    className={`font-readable text-[13px] font-bold leading-snug break-words text-black ${item.done ? 'line-through opacity-60' : 'cursor-pointer'}`}
-                                                                >
-                                                                    {item.title || item.text}
-                                                                </div>
-                                                            )}
+                                                            <div className="flex items-center gap-2">
+                                                                {editingTitle ? (
+                                                                    <input
+                                                                        type="text"
+                                                                        autoFocus
+                                                                        value={libFieldDraft}
+                                                                        onChange={(e) => setLibFieldDraft(e.target.value)}
+                                                                        onBlur={saveLibFieldEdit}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter') saveLibFieldEdit();
+                                                                            if (e.key === 'Escape') setEditingLibField(null);
+                                                                        }}
+                                                                        className="font-readable text-[13px] font-bold leading-snug flex-1 min-w-0 bg-transparent border-b-2 focus:outline-none text-black"
+                                                                        style={{ borderColor: activeTheme.primary }}
+                                                                    />
+                                                                ) : (
+                                                                    <div 
+                                                                        onClick={() => !item.done && openLibFieldEdit(item, 'title')}
+                                                                        className={`font-readable text-[13px] font-bold leading-snug break-words text-black ${item.done ? 'line-through opacity-60' : 'cursor-pointer'}`}
+                                                                    >
+                                                                        {item.title || item.text}
+                                                                    </div>
+                                                                )}
+                                                                {!item.description && !item.done && !editingDesc && (
+                                                                    <button 
+                                                                        onClick={() => openLibFieldEdit(item, 'description')}
+                                                                        className="flex-shrink-0 text-gray-400 text-sm leading-none active:scale-90"
+                                                                        title="Add description"
+                                                                    >
+                                                                        +
+                                                                    </button>
+                                                                )}
+                                                            </div>
 
                                                             {editingDesc ? (
                                                                 <textarea
@@ -1541,16 +1552,7 @@
                                                                 >
                                                                     {item.description}
                                                                 </div>
-                                                            ) : (
-                                                                editingTitle && !item.done && (
-                                                                    <div 
-                                                                        onClick={() => openLibFieldEdit(item, 'description')}
-                                                                        className="font-readable text-[12px] leading-snug mt-0.5 text-gray-400 italic cursor-pointer"
-                                                                    >
-                                                                        + add description
-                                                                    </div>
-                                                                )
-                                                            )}
+                                                            ) : null}
 
                                                             {activeLibCat === 'all' && cat && (
                                                                 <div className="text-[8px] opacity-60 mt-1 text-black">{cat.emoji} {cat.name}</div>
