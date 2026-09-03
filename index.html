@@ -91,6 +91,12 @@
         .animate-slide-up-in { animation: slideUpIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
         .animate-slide-down-out { animation: slideDownOut 0.3s cubic-bezier(0.5, 0, 0.75, 0) forwards; }
 
+        @keyframes slideInLeft {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(0); }
+        }
+        .animate-slide-in-left { animation: slideInLeft 0.25s ease-out forwards; }
+
         @keyframes holdPulse {
             0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.55); }
             50% { transform: scale(1.03); box-shadow: 0 0 0 6px rgba(255, 215, 0, 0); }
@@ -438,6 +444,7 @@
 
             // Tavern & Activity are full-screen overlays now, separate from the main board/list/archive tabs
             const [showTavern, setShowTavern] = useState(false);
+            const [showEncyclopediaNav, setShowEncyclopediaNav] = useState(false);
             const [tavernClosing, setTavernClosing] = useState(false);
             const [showActivity, setShowActivity] = useState(false);
             const [activityClosing, setActivityClosing] = useState(false);
@@ -1268,33 +1275,14 @@
                             )}
 
                             {activeTab === 'archive' && (
-                                <div className="flex overflow-x-auto hide-scrollbar px-2 py-2 gap-2 items-center flex-1">
-                                    {libraryCategories.map(cat => (
-                                        <div key={cat.id} className="flex items-center">
-                                            <button 
-                                                onClick={() => { sound.playBlip(); setActiveLibCat(cat.id); }}
-                                                className={`px-3 py-2 pixel-box-sm text-[10px] whitespace-nowrap active:scale-95 flex items-center gap-1 ${activeLibCat === cat.id ? 'bg-white text-black' : 'bg-transparent text-inherit'}`}
-                                                style={{ borderColor: activeTheme.hudText, color: activeLibCat !== cat.id ? activeTheme.hudText : 'black' }}
-                                            >
-                                                <span>{cat.emoji}</span> <span>{cat.name}</span>
-                                            </button>
-                                            {activeLibCat === cat.id && cat.id !== 'all' && (
-                                                <button 
-                                                    onClick={() => { sound.playBlip(); setDeleteConfirm({ show: true, type: 'libCat', id: cat.id, name: cat.name }); }}
-                                                    className="ml-1 p-2 text-red-400 hover:bg-red-500/20 active:scale-90 rounded"
-                                                    title="Delete List"
-                                                >
-                                                    <span className="text-[10px] font-bold">X</span>
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
-                                    <button 
-                                        onClick={() => { sound.playBlip(); setIsAddingLibCat(true); }}
-                                        className="px-3 py-2 pixel-box-sm text-[10px] whitespace-nowrap bg-black/40 text-white active:scale-95 border-dashed"
-                                        style={{ borderColor: activeTheme.hudText }}
+                                <div className="flex items-center px-2 py-2 flex-1">
+                                    <button
+                                        onClick={() => { sound.playBlip(); setShowEncyclopediaNav(true); }}
+                                        className="flex items-center gap-2 pixel-box-sm px-3 py-2 text-[10px] active:scale-95"
+                                        style={{ backgroundColor: 'rgba(0,0,0,0.3)', color: activeTheme.hudText, borderColor: activeTheme.hudText }}
                                     >
-                                        + NEW LIST
+                                        <span>☰</span>
+                                        <span>{libraryCategories.find(c => c.id === activeLibCat)?.emoji} {libraryCategories.find(c => c.id === activeLibCat)?.name}</span>
                                     </button>
                                 </div>
                             )}
@@ -1667,6 +1655,48 @@
                         </div>
                     )}
 
+                    {/* --- ENCYCLOPEDIA CATEGORY DRAWER (slides in from the side, distinct from the Kanban board tabs) --- */}
+                    {showEncyclopediaNav && (
+                        <div className="fixed inset-0 z-[95] flex">
+                            <div className="absolute inset-0 bg-black/50" onClick={() => setShowEncyclopediaNav(false)}></div>
+                            <div 
+                                className="relative w-64 max-w-[80vw] h-full pixel-box animate-slide-in-left overflow-y-auto flex flex-col"
+                                style={{ backgroundColor: activeTheme.windowBg, borderColor: activeTheme.border }}
+                            >
+                                <div className="p-4 pt-safe flex-shrink-0" style={{ backgroundColor: activeTheme.hudBg, color: activeTheme.hudText, borderBottom: `4px solid ${activeTheme.border}` }}>
+                                    <h3 className="text-sm">📚 ENCYCLOPEDIA LISTS</h3>
+                                </div>
+                                <div className="p-3 flex flex-col gap-2 flex-1 overflow-y-auto hide-scrollbar">
+                                    {libraryCategories.map(cat => (
+                                        <div key={cat.id} className="flex items-center gap-1">
+                                            <button
+                                                onClick={() => { sound.playBlip(); setActiveLibCat(cat.id); setShowEncyclopediaNav(false); }}
+                                                className={`flex-1 flex items-center gap-2 pixel-box-sm px-3 py-2 text-[11px] text-left active:scale-95 ${activeLibCat === cat.id ? 'bg-yellow-400 text-black' : 'bg-white/60 text-black'}`}
+                                            >
+                                                <span>{cat.emoji}</span> <span>{cat.name}</span>
+                                            </button>
+                                            {cat.id !== 'all' && activeLibCat === cat.id && (
+                                                <button
+                                                    onClick={() => { sound.playBlip(); setDeleteConfirm({ show: true, type: 'libCat', id: cat.id, name: cat.name }); setShowEncyclopediaNav(false); }}
+                                                    className="p-2 text-red-500 active:scale-90 flex-shrink-0"
+                                                    title="Delete List"
+                                                >
+                                                    X
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                    <button
+                                        onClick={() => { sound.playBlip(); setIsAddingLibCat(true); setShowEncyclopediaNav(false); }}
+                                        className="pixel-box-sm px-3 py-2 text-[10px] bg-black/10 text-black border-dashed border-2 mt-2 active:scale-95"
+                                    >
+                                        + NEW LIST
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {showStatsModal && (
                         <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
                             <div className="w-full max-w-xs pixel-box bg-white p-6 animate-pop relative max-h-[90vh] overflow-y-auto hide-scrollbar" style={{ backgroundColor: activeTheme.windowBg }}>
@@ -2014,9 +2044,17 @@
 
                     {editingTaskId && editForm && (
                         <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
-                            <div className="w-full max-w-md pixel-box bg-white p-6 animate-pop pb-safe max-h-[90vh] overflow-y-auto hide-scrollbar" style={{ backgroundColor: activeTheme.windowBg }}>
-                                <h2 className="text-sm mb-4">EDIT QUEST</h2>
+                            <div className="w-full max-w-md pixel-box p-0 animate-pop pb-safe max-h-[90vh] overflow-y-auto hide-scrollbar" style={{ backgroundColor: activeTheme.windowBg }}>
+                                <div className="flex items-center justify-between px-6 py-3 mb-4" style={{ backgroundColor: '#1c7a91', color: '#ffffff' }}>
+                                    <h2 className="text-sm flex items-center gap-2">✏️ EDIT QUEST</h2>
+                                    {(() => {
+                                        const editingTask = tasks.find(t => t.id === editingTaskId);
+                                        const statusLabel = editingTask?.status === 'doing' ? '⚔️ IN BATTLE' : editingTask?.status === 'done' ? '✓ VICTORY' : '📜 QUEST LOG';
+                                        return <span className="text-[9px] pixel-box-sm px-2 py-1 bg-black/25">{statusLabel}</span>;
+                                    })()}
+                                </div>
 
+                                <div className="px-6">
                                 <textarea
                                     value={editForm.text}
                                     onChange={(e) => setEditForm({ ...editForm, text: e.target.value })}
@@ -2143,9 +2181,18 @@
                                     {boards.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                                 </select>
 
-                                <div className="flex gap-3">
+                                <div className="flex gap-3 pb-6">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => { handleDeleteTask(editingTaskId); closeEditTask(); }} 
+                                        className="pixel-box-sm px-4 py-3 text-xs bg-red-500 text-white active:scale-95"
+                                        title="Delete this quest"
+                                    >
+                                        🗑
+                                    </button>
                                     <button type="button" onClick={closeEditTask} className="flex-1 pixel-box-sm py-3 text-xs bg-gray-300 text-black active:scale-95">CANCEL</button>
                                     <button type="button" onClick={saveTaskEdit} className="flex-1 pixel-box-sm py-3 text-xs bg-green-500 text-white active:scale-95">SAVE CHANGES</button>
+                                </div>
                                 </div>
                             </div>
                         </div>
