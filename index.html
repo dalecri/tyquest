@@ -258,26 +258,6 @@
             </svg>
         );
 
-        const IconSearch = ({ active }) => (
-            <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor" className={`transition-opacity ${active ? "opacity-100" : "opacity-40"}`}>
-                <rect x="2" y="2" width="7" height="2" />
-                <rect x="2" y="2" width="2" height="7" />
-                <rect x="7" y="2" width="2" height="7" />
-                <rect x="2" y="7" width="7" height="2" />
-                <rect x="9" y="9" width="2" height="2" />
-                <rect x="11" y="11" width="2" height="2" />
-                <rect x="13" y="13" width="2" height="2" />
-            </svg>
-        );
-
-        const IconAccount = ({ active }) => (
-            <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor" className={`transition-opacity ${active ? "opacity-100" : "opacity-40"}`}>
-                <rect x="6" y="2" width="4" height="4" />
-                <rect x="4" y="7" width="8" height="2" />
-                <rect x="3" y="9" width="10" height="5" />
-            </svg>
-        );
-
         const IconBoss = () => (
             <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor" className="text-red-500 animate-pulse">
                 <rect x="4" y="2" width="8" height="8" />
@@ -432,37 +412,6 @@
         // Encyclopedia list-item markers — a list isn't always a checklist, so each category can
         // pick its own style: a checkbox, a colored dot, an auto-numbered badge, or a star.
         const MARKER_STYLES = ['check', 'number', 'emoji', 'none'];
-
-        // Cozy, low-stakes color families for the auto-generated entry thumbnails — soft pastel
-        // bands rather than a smooth blend, echoing a simple abstract "cover" block.
-        const COZY_GRADIENT_PALETTES = [
-            ['#dbeafe', '#93c5fd', '#3b82f6'], // cozy blue
-            ['#fef3c7', '#fcd34d', '#f59e0b'], // warm sand
-            ['#dcfce7', '#86efac', '#22c55e'], // sage green
-            ['#fce7f3', '#f9a8d4', '#ec4899'], // dusty pink
-            ['#ede9fe', '#c4b5fd', '#8b5cf6'], // lavender
-            ['#ffe4e6', '#fda4af', '#f43f5e'], // coral
-            ['#e0f2fe', '#7dd3fc', '#0ea5e9'], // sky
-            ['#fef9c3', '#fde047', '#eab308']  // butter yellow
-        ];
-
-        const hashStringToInt = (str) => {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = (hash << 5) - hash + str.charCodeAt(i);
-                hash |= 0;
-            }
-            return Math.abs(hash);
-        };
-
-        // Same id always yields the same block — generated once, not re-randomized every render.
-        const getEntryGradient = (id) => {
-            const hash = hashStringToInt(String(id));
-            const palette = COZY_GRADIENT_PALETTES[hash % COZY_GRADIENT_PALETTES.length];
-            const angle = [0, 45, 90, 135][hash % 4];
-            return `linear-gradient(${angle}deg, ${palette[0]} 0%, ${palette[0]} 33%, ${palette[1]} 33%, ${palette[1]} 66%, ${palette[2]} 66%, ${palette[2]} 100%)`;
-        };
-
         const MARKER_STYLE_ICONS = { check: '✓', number: '①', emoji: '⭐', none: '—' };
 
         const initialLibraryItems = [
@@ -506,9 +455,6 @@
             // Tavern & Activity are full-screen overlays now, separate from the main board/list/archive tabs
             const [showTavern, setShowTavern] = useState(false);
             const [showEncyclopediaNav, setShowEncyclopediaNav] = useState(false);
-            const [libSearchQuery, setLibSearchQuery] = useState('');
-            const [showSearch, setShowSearch] = useState(false);
-            const [searchQuery, setSearchQuery] = useState('');
             const [tavernClosing, setTavernClosing] = useState(false);
             const [showActivity, setShowActivity] = useState(false);
             const [activityClosing, setActivityClosing] = useState(false);
@@ -549,21 +495,6 @@
                     setNoteDescription('');
                 }
             }, [showNoteSheet]);
-
-            useEffect(() => {
-                if (showSearch) setSearchQuery('');
-            }, [showSearch]);
-
-            const searchResults = useMemo(() => {
-                const q = searchQuery.trim().toLowerCase();
-                if (!q) return { taskResults: [], libResults: [] };
-                const taskResults = tasks.filter(t => t.text.toLowerCase().includes(q));
-                const libResults = libraryItems.filter(i =>
-                    (i.title || i.text || '').toLowerCase().includes(q) ||
-                    (i.description || '').toLowerCase().includes(q)
-                );
-                return { taskResults, libResults };
-            }, [searchQuery, tasks, libraryItems]);
 
             // Turns a repeat-picker choice into the { type, intervalDays } shape stored on the task —
             // pulled out as a pure function so both the New Quest form and the Edit Quest form can use it.
@@ -1209,16 +1140,9 @@
             }, [tasks, activeBoardId]);
 
             const filteredLibItems = useMemo(() => {
-                let items = activeLibCat === 'all' ? libraryItems : libraryItems.filter(i => i.categoryId === activeLibCat);
-                const q = libSearchQuery.trim().toLowerCase();
-                if (q) {
-                    items = items.filter(i =>
-                        (i.title || i.text || '').toLowerCase().includes(q) ||
-                        (i.description || '').toLowerCase().includes(q)
-                    );
-                }
-                return items;
-            }, [libraryItems, activeLibCat, libSearchQuery]);
+                if (activeLibCat === 'all') return libraryItems;
+                return libraryItems.filter(i => i.categoryId === activeLibCat);
+            }, [libraryItems, activeLibCat]);
 
             const activeBoardObj = boards.find(b => b.id === activeBoardId);
             const oldestFocusTask = useMemo(() => {
@@ -1430,43 +1354,14 @@
                             )}
 
                             {activeTab === 'archive' && (
-                                <div className="flex overflow-x-auto hide-scrollbar px-2 py-2 gap-2 items-center flex-1">
-                                    {libraryCategories.map(cat => (
-                                        <div key={cat.id} className="flex items-center">
-                                            <button 
-                                                onClick={() => { sound.playBlip(); setActiveLibCat(cat.id); }}
-                                                className={`px-3 py-2 rounded-md text-[10px] whitespace-nowrap active:scale-95 flex items-center gap-1 font-bold ${activeLibCat === cat.id ? 'text-white' : ''}`}
-                                                style={activeLibCat === cat.id 
-                                                    ? { backgroundColor: '#e8543a' } 
-                                                    : { backgroundColor: 'rgba(255,255,255,0.15)', color: activeTheme.hudText }
-                                                }
-                                            >
-                                                <span>{cat.emoji}</span> <span>{cat.name}</span>
-                                            </button>
-                                            {activeLibCat === cat.id && cat.id !== 'all' && (
-                                                <button 
-                                                    onClick={() => { sound.playBlip(); setDeleteConfirm({ show: true, type: 'libCat', id: cat.id, name: cat.name }); }}
-                                                    className="ml-1 p-2 text-red-300 hover:bg-red-500/20 active:scale-90 rounded"
-                                                    title="Delete List"
-                                                >
-                                                    <span className="text-[10px] font-bold">X</span>
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
-                                    <button 
-                                        onClick={() => { sound.playBlip(); setIsAddingLibCat(true); }}
-                                        className="px-3 py-2 rounded-md text-[10px] whitespace-nowrap bg-white/10 text-white active:scale-95 border-dashed border"
-                                        style={{ borderColor: activeTheme.hudText }}
-                                    >
-                                        + NEW LIST
-                                    </button>
+                                <div className="flex items-center px-2 py-2 flex-1">
                                     <button
                                         onClick={() => { sound.playBlip(); setShowEncyclopediaNav(true); }}
-                                        className="px-2 py-2 rounded-md text-xs whitespace-nowrap bg-white/10 text-white active:scale-95 flex-shrink-0"
-                                        title="List marker style settings"
+                                        className="flex items-center gap-2 pixel-box-sm px-3 py-2 text-[10px] active:scale-95"
+                                        style={{ backgroundColor: 'rgba(0,0,0,0.3)', color: activeTheme.hudText, borderColor: activeTheme.hudText }}
                                     >
-                                        ⚙️
+                                        <span>☰</span>
+                                        <span>{libraryCategories.find(c => c.id === activeLibCat)?.emoji} {libraryCategories.find(c => c.id === activeLibCat)?.name}</span>
                                     </button>
                                 </div>
                             )}
@@ -1480,29 +1375,6 @@
                                 {isNavVisible ? <IconChevronUp /> : <IconChevronDown />}
                             </button>
                         </div>
-
-                        {activeTab === 'archive' && (
-                            <div className="px-3 py-2 flex items-center gap-2" style={{ backgroundColor: activeTheme.hudBg }}>
-                                <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-md bg-white">
-                                    <span className="text-sm">🔍</span>
-                                    <input
-                                        type="text"
-                                        value={libSearchQuery}
-                                        onChange={(e) => setLibSearchQuery(e.target.value)}
-                                        placeholder={`Search in ${libraryCategories.find(c => c.id === activeLibCat)?.name || 'Titles'}...`}
-                                        className="font-readable flex-1 min-w-0 text-[13px] text-black bg-transparent focus:outline-none"
-                                    />
-                                </div>
-                                <button
-                                    onClick={() => { sound.playBlip(); setShowNoteSheet(true); }}
-                                    className="w-10 h-10 flex-shrink-0 rounded-md flex items-center justify-center text-base active:scale-90"
-                                    style={{ backgroundColor: activeTheme.primary }}
-                                    title="New entry"
-                                >
-                                    ✏️
-                                </button>
-                            </div>
-                        )}
                     </header>
 
                     {}
@@ -1608,7 +1480,7 @@
                             <div className="flex-1 overflow-x-auto snap-x snap-mandatory hide-scrollbar p-4 flex gap-4 items-start h-full pb-8">
                                 <div className="w-[100%] max-w-[500px] md:max-w-[720px] lg:max-w-[960px] h-full mx-auto flex-shrink-0 snap-center flex flex-col pixel-box relative overflow-hidden" style={{ backgroundColor: activeTheme.windowBg }}>
                                     
-                                    <div className="overflow-y-auto hide-scrollbar flex-1">
+                                    <div className="overflow-y-auto hide-scrollbar flex-1 pb-20">
                                         {filteredLibItems.length === 0 && (
                                             <div className="text-center opacity-50 text-[10px] py-8 text-black">
                                                 NO ITEMS SAVED
@@ -1625,10 +1497,6 @@
                                                     style={{ borderColor: activeTheme.border }}
                                                 >
                                                     <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
-                                                        <div 
-                                                            className="w-11 h-11 flex-shrink-0 rounded-md pixel-box-sm"
-                                                            style={{ background: getEntryGradient(item.id), opacity: item.done ? 0.4 : 1, borderColor: activeTheme.border }}
-                                                        ></div>
                                                         {renderLibraryMarker(item, cat)}
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-2">
@@ -1702,6 +1570,21 @@
                                         })}
                                     </div>
 
+                                    <button
+                                        onClick={() => { sound.playBlip(); setShowNoteSheet(true); }}
+                                        className="absolute w-14 h-14 rounded-full flex items-center justify-center text-white text-3xl font-bold active:scale-90 z-20"
+                                        style={{ 
+                                            backgroundColor: activeTheme.primary, 
+                                            border: `3px solid ${activeTheme.border}`,
+                                            boxShadow: '3px 3px 0px rgba(0,0,0,0.3)',
+                                            right: '1.25rem',
+                                            bottom: 'calc(1.25rem + env(safe-area-inset-bottom, 0px))'
+                                        }}
+                                        title="New entry"
+                                    >
+                                        +
+                                    </button>
+
                                 </div>
                             </div>
                         )}
@@ -1714,80 +1597,19 @@
                         style={{ backgroundColor: activeTheme.hudBg, borderTop: `4px solid ${activeTheme.border}`, minHeight: '55px' }}
                     >
                         {[
-                            { id: 'home', label: 'Home', Icon: IconBoard, onClick: () => setActiveTab('tasks') },
-                            { id: 'search', label: 'Search', Icon: IconSearch, onClick: () => setShowSearch(true) },
-                            { id: 'saved', label: 'Encyclopedia', Icon: IconArchive, onClick: () => setActiveTab('archive') },
-                            { id: 'account', label: 'Account', Icon: IconAccount, onClick: () => setShowStatsModal(true) }
-                        ].map(tab => {
-                            const bottomNavActive = showStatsModal ? 'account' : showSearch ? 'search' : activeTab === 'archive' ? 'saved' : 'home';
-                            const isActive = bottomNavActive === tab.id;
-                            return (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => { sound.playBlip(); tab.onClick(); }}
-                                    className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 active:bg-black/20"
-                                    style={{ color: isActive ? activeTheme.primary : activeTheme.hudText, opacity: isActive ? 1 : 0.6 }}
-                                >
-                                    <tab.Icon active={isActive} />
-                                    <span className="text-[7px] font-bold">{tab.label}</span>
-                                </button>
-                            );
-                        })}
+                            { id: 'tasks', Icon: IconBoard },
+                            { id: 'archive', Icon: IconArchive }
+                        ].map(tab => (
+                            <button
+                                key={tab.id}
+                                onClick={() => { sound.playBlip(); setActiveTab(tab.id); }}
+                                className="flex-1 flex items-center justify-center py-3 active:bg-black/20"
+                                style={{ color: activeTheme.hudText, opacity: activeTab === tab.id ? 1 : 0.5 }}
+                            >
+                                <tab.Icon active={activeTab === tab.id} />
+                            </button>
+                        ))}
                     </nav>
-
-                    {/* --- SEARCH OVERLAY (searches quest titles + encyclopedia titles/descriptions together) --- */}
-                    {showSearch && (
-                        <div className="fixed inset-0 z-[90] flex flex-col animate-slide-up-in" style={{ backgroundColor: activeTheme.bg }}>
-                            <div className="flex items-center gap-2 p-4 pt-safe flex-shrink-0" style={{ backgroundColor: activeTheme.hudBg, borderBottom: `4px solid ${activeTheme.border}` }}>
-                                <input
-                                    type="text"
-                                    autoFocus
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search quests & encyclopedia..."
-                                    className="font-readable flex-1 pixel-box-sm p-2 text-[13px] bg-white text-black focus:outline-none"
-                                />
-                                <button onClick={() => setShowSearch(false)} className="pixel-box-sm px-3 py-2 text-[10px] bg-red-500 text-white active:scale-95 flex-shrink-0">CLOSE</button>
-                            </div>
-                            <div className="flex-1 overflow-y-auto hide-scrollbar p-4">
-                                {!searchQuery.trim() && (
-                                    <p className="text-center text-[10px] opacity-50 py-8" style={{ color: activeTheme.border }}>Start typing to search…</p>
-                                )}
-                                {searchQuery.trim() && searchResults.taskResults.length === 0 && searchResults.libResults.length === 0 && (
-                                    <p className="text-center text-[10px] opacity-50 py-8" style={{ color: activeTheme.border }}>No results found</p>
-                                )}
-                                {searchResults.taskResults.length > 0 && (
-                                    <div className="mb-4">
-                                        <h3 className="text-[10px] mb-2 opacity-70" style={{ color: activeTheme.border }}>⚔️ QUESTS</h3>
-                                        {searchResults.taskResults.map(t => (
-                                            <button
-                                                key={t.id}
-                                                onClick={() => { setShowSearch(false); setActiveTab('tasks'); setTaskViewMode('list'); openEditTask(t); }}
-                                                className="w-full text-left px-3 py-2 pixel-box-sm mb-2 bg-white/70 text-black text-[12px] font-readable active:scale-95"
-                                            >
-                                                {t.text}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                                {searchResults.libResults.length > 0 && (
-                                    <div>
-                                        <h3 className="text-[10px] mb-2 opacity-70" style={{ color: activeTheme.border }}>📚 ENCYCLOPEDIA</h3>
-                                        {searchResults.libResults.map(i => (
-                                            <button
-                                                key={i.id}
-                                                onClick={() => { setShowSearch(false); setActiveTab('archive'); setActiveLibCat(i.categoryId); }}
-                                                className="w-full text-left px-3 py-2 pixel-box-sm mb-2 bg-white/70 text-black text-[12px] font-readable active:scale-95"
-                                            >
-                                                <div className="font-bold">{i.title || i.text}</div>
-                                                {i.description && <div className="text-[10px] text-gray-500 mt-0.5">{i.description}</div>}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
 
                     {/* --- NEW ENCYCLOPEDIA ENTRY (bottom sheet, ~half height, opened via the floating + button) --- */}
                     {showNoteSheet && (
@@ -2003,7 +1825,7 @@
                         </div>
                     )}
 
-                    {/* --- LIST SETTINGS (marker style only — switching/creating/deleting now happens via the pills above) --- */}
+                    {/* --- ENCYCLOPEDIA CATEGORY DRAWER (slides in from the side, distinct from the Kanban board tabs) --- */}
                     {showEncyclopediaNav && (
                         <div className="fixed inset-0 z-[95] flex">
                             <div className="absolute inset-0 bg-black/50" onClick={() => setShowEncyclopediaNav(false)}></div>
@@ -2012,24 +1834,43 @@
                                 style={{ backgroundColor: activeTheme.windowBg, borderColor: activeTheme.border }}
                             >
                                 <div className="p-4 pt-safe flex-shrink-0" style={{ backgroundColor: activeTheme.hudBg, color: activeTheme.hudText, borderBottom: `4px solid ${activeTheme.border}` }}>
-                                    <h3 className="text-sm">⚙️ LIST MARKER STYLE</h3>
-                                    <p className="text-[8px] mt-1 opacity-70">Tap a list's icon to cycle its style</p>
+                                    <h3 className="text-sm">📚 ENCYCLOPEDIA LISTS</h3>
                                 </div>
                                 <div className="p-3 flex flex-col gap-2 flex-1 overflow-y-auto hide-scrollbar">
-                                    {libraryCategories.filter(cat => cat.id !== 'all').map(cat => (
-                                        <div key={cat.id} className="flex items-center gap-2 pixel-box-sm px-3 py-2 bg-white/60 text-black">
-                                            <span className="flex-1 flex items-center gap-2 text-[11px]">
-                                                <span>{cat.emoji}</span> <span>{cat.name}</span>
-                                            </span>
+                                    {libraryCategories.map(cat => (
+                                        <div key={cat.id} className="flex items-center gap-1">
                                             <button
-                                                onClick={() => cycleCategoryMarkerStyle(cat.id)}
-                                                className="w-8 h-8 flex-shrink-0 pixel-box-sm flex items-center justify-center text-xs bg-white active:scale-90"
-                                                title="Change how items in this list are marked"
+                                                onClick={() => { sound.playBlip(); setActiveLibCat(cat.id); setShowEncyclopediaNav(false); }}
+                                                className={`flex-1 flex items-center gap-2 pixel-box-sm px-3 py-2 text-[11px] text-left active:scale-95 ${activeLibCat === cat.id ? 'bg-yellow-400 text-black' : 'bg-white/60 text-black'}`}
                                             >
-                                                {MARKER_STYLE_ICONS[cat.markerStyle || 'check']}
+                                                <span>{cat.emoji}</span> <span>{cat.name}</span>
                                             </button>
+                                            {cat.id !== 'all' && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); cycleCategoryMarkerStyle(cat.id); }}
+                                                    className="w-8 h-8 flex-shrink-0 pixel-box-sm flex items-center justify-center text-xs bg-white/60 text-black active:scale-90"
+                                                    title="Change how items in this list are marked"
+                                                >
+                                                    {MARKER_STYLE_ICONS[cat.markerStyle || 'check']}
+                                                </button>
+                                            )}
+                                            {cat.id !== 'all' && activeLibCat === cat.id && (
+                                                <button
+                                                    onClick={() => { sound.playBlip(); setDeleteConfirm({ show: true, type: 'libCat', id: cat.id, name: cat.name }); setShowEncyclopediaNav(false); }}
+                                                    className="p-2 text-red-500 active:scale-90 flex-shrink-0"
+                                                    title="Delete List"
+                                                >
+                                                    X
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
+                                    <button
+                                        onClick={() => { sound.playBlip(); setIsAddingLibCat(true); setShowEncyclopediaNav(false); }}
+                                        className="pixel-box-sm px-3 py-2 text-[10px] bg-black/10 text-black border-dashed border-2 mt-2 active:scale-95"
+                                    >
+                                        + NEW LIST
+                                    </button>
                                 </div>
                             </div>
                         </div>
